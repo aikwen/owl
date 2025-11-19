@@ -1,77 +1,14 @@
-from dataclasses import dataclass
 import albumentations as albu
 from typing import List, Optional, Union
-
-
-@dataclass
-class BaseAugConfig:
-    """
-    p 概率值, 0-1之间
-    """
-    p: float
-
-@dataclass
-class RotateConfig(BaseAugConfig):
-    """
-    随机旋转
-    """
-    pass
-
-@dataclass
-class VFlipConfig(BaseAugConfig):
-    """
-    垂直反转
-    """
-    pass
-
-@dataclass
-class HFlipConfig(BaseAugConfig):
-    """
-    水平反转
-    """
-    pass
-
-@dataclass
-class ResizeConfig(BaseAugConfig):
-    """
-    改变尺寸
-    """
-    height: int
-    width: int
-
-@dataclass
-class JpegConfig(BaseAugConfig):
-    """
-    jpeg 压缩
-    随机在 [quality_low, quality_high] 区间之间选择一个质量因子进行压缩
-    """
-    quality_low: int
-    quality_high: int
-
-@dataclass
-class GblurConfig(BaseAugConfig):
-    """
-    高斯模糊
-    随机在 [kernel_low, kernel_high] 区间之间选择一个 kernal size
-    """
-    kernel_low: int
-    kernel_high: int
-
-@dataclass
-class GNoiseConfig(BaseAugConfig):
-    """
-    高斯噪声
-    """
-    std_low: float
-    std_high: float
-
-@dataclass
-class ScaleConfig(BaseAugConfig):
-    """
-    随机在 (1+scale1, 1+scale2) 之间旋转一个值进行缩放
-    """
-    scale1: float
-    scale2: float
+from .types import (BaseAugConfig,
+                    RotateConfig,
+                    VFlipConfig,
+                    HFlipConfig,
+                    ResizeConfig,
+                    JpegConfig,
+                    GblurConfig,
+                    GNoiseConfig,
+                    ScaleConfig)
 
 def config2transform(cfg: BaseAugConfig) -> albu.BasicTransform:
     """
@@ -128,4 +65,3 @@ def aug_compose(aug_list: List[AugmentItemType]) -> Optional[albu.Compose]:
         else:
             pass
     return albu.Compose([item for item in l])
-
