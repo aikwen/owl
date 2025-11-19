@@ -1,5 +1,6 @@
 from PIL import Image
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.dataset import ConcatDataset
 from typing import Union, Dict, List, Optional
 import albumentations as albu
 import pathlib
@@ -36,7 +37,7 @@ class ImageDataset(Dataset):
             idx (int): 对应的下标
         Returns:
             tp (tensor) shape [channel, height, width], channel = 3
-            gt (tensor) shape [height, width]
+            gt (tensor) shape [channel, height, width], channel = 1
             tp_name (str) 图像名, 比如 tp.png
             gt_name (str)图像名， 比如 gt.png
         """
@@ -68,10 +69,22 @@ class ImageDataset(Dataset):
 
         # to tensor
         tp_tensor = torch.from_numpy(tp_array).to(torch.float32).permute(2, 0, 1)
-        gt_tensor = torch.from_numpy(gt_array).to(torch.float32)
+        gt_tensor = torch.from_numpy(gt_array).to(torch.float32).unsqueeze(0)
         tp_name = tp_img_path.name
         gt_name = gt_img_path.name if gt_img_path is not None else ""
         return (tp_tensor,
                 gt_tensor,
                 tp_name,
                 gt_name)
+
+def create_dataloader(dataset_list:List[pathlib.Path],
+                    transform:Optional[albu.Compose],
+                    batchsize:int,
+                    num_workers:int=0,
+                    shuffle:bool=True,
+                    )-> DataLoader:
+    datasets = []
+    for path in dataset_list:
+        datasets.append(ImageDataset(path, transform=transform))
+    combined_dataset = ConcatDataset(datasets)
+    return DataLoader(combined_dataset, batch_size=batchsize, shuffle=shuffle, num_workers=num_workers)
