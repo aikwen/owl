@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
-from typing import Union, Any
+from typing import Union, Any, Optional
 from PIL import Image
-
+import  logging
 
 def load_json(path: Union[str, Path]) -> Any:
     """
@@ -50,4 +50,37 @@ def load_image(path: Union[str, Path]) -> Image.Image:
         return img
     except Exception as e:
         raise RuntimeError(f"图像读取失败: {p.name} -> {e}")
+
+def create_dir(path: Union[str, Path]) -> None:
+    try:
+        p = Path(path)
+        p.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        raise RuntimeError(f"Error: 无法创建输出目录。Error: {e}")
+
+def create_logger(
+                log_file: str,
+                level: int = logging.INFO,
+                ) -> logging.Logger:
+    p = Path(log_file)
+    logger = logging.getLogger(str(p.resolve()))
+    logger.setLevel(level)
+    # 不向根 logger 冒泡，避免重复输出到控制台
+    logger.propagate = False
+    # 避免重复添加 handler
+    if not logger.handlers:
+        if p.parent:
+            p.parent.mkdir(parents=True, exist_ok=True)
+        fh = logging.FileHandler(p, encoding="utf-8")
+        fh.setLevel(level)
+
+        formatter = logging.Formatter(
+            fmt="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        fh.setFormatter(formatter)
+
+        logger.addHandler(fh)
+
+    return logger
 
