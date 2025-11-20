@@ -60,9 +60,10 @@ def create_dir(path: Union[str, Path]) -> None:
 
 def create_logger(
                 log_file: str,
+                mode: str,
                 level: int = logging.INFO,
                 ) -> logging.Logger:
-    p = Path(log_file)
+    p = Path(f"{log_file}_{mode}.log")
     logger = logging.getLogger(str(p.resolve()))
     logger.setLevel(level)
     # 不向根 logger 冒泡，避免重复输出到控制台
