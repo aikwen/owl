@@ -1,7 +1,6 @@
 from torch.utils.data import DataLoader
 from torch import nn
 import torch
-import logging
 from pathlib import Path
 
 from typing import  Optional, Any, Dict
@@ -105,6 +104,14 @@ class OwlEngine:
         self.log_name = log_name
         return self
 
+    def config_autosave(self, autosave:bool) -> 'OwlEngine':
+        """
+        设置是否自动保存权重
+        :param autosave:
+        :return:
+        """
+        self.autosave = autosave
+        return self
 
     def build(self) -> 'OwlEngine':
         """
@@ -157,13 +164,15 @@ class OwlEngine:
         self.criterion.to(self.status.device)
         logger.info(f"✅ 当前训练设备：{self.status.device}")
 
+        logger.info(f"✅ 当前训练模式：{self.train_mode}")
         # 断点续训
         if self.train_mode == TrainMode.RESUME:
             self.status.load_state_dict(self.pre_checkpoint, only_model=False)
+            logger.info(f"✅ 加载权重成功！")
         # 迁移学习
         elif self.train_mode == TrainMode.FINETUNE:
             self.status.load_state_dict(self.pre_checkpoint, only_model=True)
-        logger.info(f"✅ 当前训练模式：{self.train_mode}")
+            logger.info(f"✅ 加载权重成功！")
 
         # 创建权重输出文件夹
         if self.autosave:
