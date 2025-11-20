@@ -209,9 +209,8 @@ class OwlEngine:
             interval_loss += loss.item()
             # 每 10 轮打印平均损失和当前的学习率
             if i % 10 == 0:
-                interval_loss = f"{interval_loss / 10:.5f}"
                 cur_lr = f"{self.status.optimizer.param_groups[0]['lr']:.8f}"
-                logger.info(f"epoch-{self.status.epoch:03d} | {i-9}~{i} batch avg loss {interval_loss} | lr:{cur_lr}")
+                logger.info(f"epoch-{self.status.epoch:03d} | {i-9}~{i} batch avg loss {interval_loss / 10:.5f} | lr:{cur_lr}")
                 # 清空这10轮的损失
                 interval_loss = 0.0
 
