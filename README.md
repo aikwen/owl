@@ -2,8 +2,6 @@
 ![Python Version](https://img.shields.io/badge/python->3.7-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-my IMDL utils.
-
 ## Installation (TestPyPI)
 
 Currently, this package is available on **TestPyPI**. You can install it using the following command:
