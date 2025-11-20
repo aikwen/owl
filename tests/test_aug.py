@@ -6,8 +6,11 @@ from pathlib import Path
 if __name__ == '__main__':
     transform_configs = [
         types.ResizeConfig(width=512, height=512, p = 1),
-        # types.GblurConfig(kernel_low=15, kernel_high=15,p=1),
-        types.RotateConfig(p=1)
+        types.RotateConfig(p=1),
+        types.VFlipConfig(p=0),
+        types.HFlipConfig(p=0),
+        types.JpegConfig(quality_low=70, quality_high=100, p=0),
+        types.GblurConfig(kernel_low=3, kernel_high=15, p=0),
     ]
     transform = img_aug.aug_compose(transform_configs)
 
