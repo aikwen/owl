@@ -12,7 +12,7 @@ def init_command(args):
 
     if target_path.exists():
         print(f"⚠️ 文件已存在: {target_path}")
-        overwrite = input("❓ 是否覆盖? (y/[n]): ").lower()
+        overwrite = input("❓ 是否覆盖? (y/[n]): ").lower().strip()
         if overwrite != 'y':
             print("❌ 操作已取消。")
             return
