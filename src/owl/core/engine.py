@@ -111,28 +111,38 @@ class OwlEngine:
         构造整个 engine
         :return:
         """
+        # 检查是否设置了日志输出和权重输出文件
+        if self.log_name == "":
+            raise RuntimeError("❌ Engine Build Error: 日志文件名未配置。")
         logger = file_io.create_logger(self.log_name, "train")
+
         # 检查模型
         if self.status.model is None:
             raise RuntimeError("❌ Engine Build Error: Model 未配置。")
         logger.info("✅ 初始化模型")
+
         # 检查数据集
         if self.status.train_loader is None:
             raise RuntimeError("❌ Engine Build Error: TrainLoader 未配置。")
         logger.info("✅ 初始化训练数据集")
+
+        # 检查 epoch
         if self.epochs <= 0:
             raise RuntimeError("❌ Engine Build Error: epochs 必须大于等于 0")
         logger.info("✅ 初始化epoch")
+
         # 检查优化器
         if self.status.optimizer is None:
             raise RuntimeError("❌ Engine Build Error: Optimizer 未配置。")
         logger.info("✅ 初始化优化器")
+
         # 检查学习率优化器
         if self.status.scheduler is None:
             # 可以没有学习率优化器，暂时先 pass， 后续写到日志里面
             logger.warning("❌ 学习率优化器未设置")
         else:
             logger.info("✅ 初始化学习率优化器")
+
         # 检查损失函数
         if self.criterion is None:
             raise RuntimeError("❌ Engine Build Error: criterion 未配置。")
@@ -142,14 +152,11 @@ class OwlEngine:
         if self.train_mode != TrainMode.TRAIN and self.pre_checkpoint is None:
             raise RuntimeError("❌ Engine Build Error: pre_checkpoint 未配置。")
 
-        # 检查是否设置了日志输出和权重输出文件
-        if self.checkpoint_dir == "" or self.log_name == "":
-            raise RuntimeError("❌ Engine Build Error: 日志和权重文件夹未配置。")
-
         # 设置 device
         self.status.model.to(self.status.device)
         self.criterion.to(self.status.device)
         logger.info(f"✅ 当前训练设备：{self.status.device}")
+
         # 断点续训
         if self.train_mode == TrainMode.RESUME:
             self.status.load_state_dict(self.pre_checkpoint, only_model=False)
@@ -157,11 +164,15 @@ class OwlEngine:
         elif self.train_mode == TrainMode.FINETUNE:
             self.status.load_state_dict(self.pre_checkpoint, only_model=True)
         logger.info(f"✅ 当前训练模式：{self.train_mode}")
+
         # 创建权重输出文件夹
         if self.autosave:
+            if self.checkpoint_dir == "":
+                raise RuntimeError("❌ Engine Build Error: 权重文件夹未配置。")
             file_io.create_dir(self.checkpoint_dir)
             logger.info(f"✅ 权重保存目录：{self.checkpoint_dir}")
         logger.info(f"{'✅' if self.autosave else '❌'} 权重自动保存：{self.autosave}")
+
         # build 结束
         self._is_built = True
         logger.info("✅ 构建结束!")
@@ -179,7 +190,8 @@ class OwlEngine:
         loader = self.status.train_loader
 
         interval_loss = 0.0
-        for i, batch in enumerate(loader):
+
+        for i, batch in enumerate(loader, start=1):
             tp, gt, _, _ = batch
             tp = tp.to(self.status.device)
             gt = gt.to(self.status.device)
@@ -199,11 +211,14 @@ class OwlEngine:
             if i % 10 == 0:
                 interval_loss = f"{interval_loss / 10:.5f}"
                 cur_lr = f"{self.status.optimizer.param_groups[0]['lr']:.8f}"
-                logger.info(f"epoch-{self.status.epoch:03d} | {i-10}~{i} batch avg loss {interval_loss} | lr:{cur_lr}")
+                logger.info(f"epoch-{self.status.epoch:03d} | {i-9}~{i} batch avg loss {interval_loss} | lr:{cur_lr}")
+                # 清空这10轮的损失
+                interval_loss = 0.0
 
-    def run(self):
+    def train(self):
         if not self._is_built:
             self.build()
+
         logger = file_io.create_logger(self.log_name, "train")
         logger.info("✅ 开始训练")
         # 训练
