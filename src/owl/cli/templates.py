@@ -39,8 +39,8 @@ def main():
     # 配置数据集
     # -------------------------------------------------------------------------
     
-    # 数据增强 pipline
-    transform_pipline_train = [
+    # 数据增强 pipeline
+    transform_pipeline_train = [
         types.RotateConfig(p=0.5),
         types.VFlipConfig(p=0.5),
         types.HFlipConfig(p=0.5),
@@ -57,7 +57,7 @@ def main():
     
     dataloader_train = dataset.create_dataloader(
                         dataset_list=datasets_train,
-                        transform=img_aug.aug_compose(transform_pipline_train),
+                        transform=img_aug.aug_compose(transform_pipeline_train),
                         batchsize=batch_size,
                         num_workers=num_workers,
                         shuffle=shuffle,
