@@ -13,7 +13,7 @@ from .status import Status
 class OwlEngine:
     def __init__(self):
         # 全局上下文
-        self.status = Status()
+        self.status:Status = Status()
         # 训练 epochs 数
         self.epochs: int = 0
         # 损失函数
@@ -28,6 +28,8 @@ class OwlEngine:
         self.autosave: bool = True
         # 是否调用了 build
         self._is_built:bool = False
+        # 验证函数
+        self.val_callback: Optional[types.ValCallback] = None
 
     def config_model(self, model:nn.Module) -> 'OwlEngine':
         """
@@ -38,15 +40,24 @@ class OwlEngine:
         self.status.model = model
         return self
 
-    def config_dataloader(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None) -> 'OwlEngine':
+    def config_dataloader(self, train_loader: DataLoader) -> 'OwlEngine':
         """
-        配置数据加载器
-        :param train_loader:
-        :param val_loader:
+        配置训练集数据加载器
+        :param train_loader: DataLoader
         :return:
         """
         self.status.train_loader = train_loader
+        return self
+
+    def config_val(self, val_loader: Dict[str, DataLoader], val_callback: types.ValCallback) -> 'OwlEngine':
+        """
+        配置验证集数据加载器
+        :param val_loader:
+        :param val_callback:
+        :return:
+        """
         self.status.val_loader = val_loader
+        self.val_callback = val_callback
         return self
 
     def config_epochs(self, epochs:int) -> 'OwlEngine':
@@ -133,6 +144,11 @@ class OwlEngine:
             raise RuntimeError("❌ Engine Build Error: TrainLoader 未配置。")
         logger.info("✅ 初始化训练数据集")
 
+        if self.status.val_loader is None or len(self.status.val_loader) == 0:
+            logger.warning("❌ 未添加验证数据集")
+        else:
+            logger.info(f"✅ 初始化验证数据集：{[name for name in self.status.val_loader.keys()]}")
+
         # 检查 epoch
         if self.epochs <= 0:
             raise RuntimeError("❌ Engine Build Error: epochs 必须大于等于 0")
@@ -195,6 +211,7 @@ class OwlEngine:
 
     def train_one_epoch(self):
         logger = file_io.create_logger(self.log_name, "train")
+        # 转为训练模式
         self.status.model.train()
         loader = self.status.train_loader
 
@@ -233,6 +250,7 @@ class OwlEngine:
             self.build()
 
         logger = file_io.create_logger(self.log_name, "train")
+        logger_val = file_io.create_logger(self.log_name, "val")
         logger.info("✅ 开始训练")
         # 训练
         for epoch in range(self.status.epoch, self.epochs):
@@ -242,5 +260,10 @@ class OwlEngine:
             if self.autosave:
                 self.save_checkpoint()
 
-            # 暂时不验证
+            # 验证
+            if self.status.val_loader is not None and len(self.status.val_loader) > 0 and self.val_callback is not None:
+                self.status.model.eval()
+                self.val_callback(model=self.status.model,
+                                  val_loader=self.status.val_loader,
+                                  logger=logger_val)
 

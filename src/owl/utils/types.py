@@ -1,5 +1,17 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import Protocol, Dict
+import torch.nn as nn
+from torch.utils.data import DataLoader
+import logging
+
+
+class ValCallback(Protocol):
+    """
+    验证函数接口
+    """
+    def __call__(self,*, model: nn.Module,val_loader:Dict[str, DataLoader] , logger: logging.Logger) :
+        ...
 
 class TrainMode(Enum):
     TRAIN = "train"       # 从头训练 (Scratch)

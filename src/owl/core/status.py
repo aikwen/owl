@@ -19,7 +19,7 @@ class Status:
     scheduler: Optional[Any] = None
     # 数据集
     train_loader: Optional[DataLoader] = None
-    val_loader: Optional[DataLoader] = None
+    val_loader: Optional[Dict[str, DataLoader]] = None
     # device default cpu
     device: torch.device = torch.device("cpu")
 
