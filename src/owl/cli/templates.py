@@ -3,10 +3,8 @@ import torch
 from torch import optim
 from torch import nn
 from pathlib import Path
-from owl.core import engine
-from owl.core import dataset
-from owl.utils import types
-from owl.utils import img_aug
+from owl.core import engine, dataset
+from owl.utils import types, img_aug
 
 # 模型定义
 class SimpleModel(nn.Module):
