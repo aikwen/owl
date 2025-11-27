@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "owl-imdl"
-version = "0.1.1"
+version = "0.1.2"
 description = "IMDL template engine"
 readme = "README.md"
 authors = [
@@ -16,6 +16,9 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 requires-python = ">=3.8"
+dependencies = [
+    "colorama>=0.4.5"
+]
 
 [project.scripts]
 owl = "owl.cli.main:main"
