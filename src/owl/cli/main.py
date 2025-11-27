@@ -1,5 +1,5 @@
 import argparse
-from .commands import init_command
+from .commands import init_command, version_command
 
 def main():
     parser = argparse.ArgumentParser(
@@ -18,6 +18,10 @@ def main():
         help="生成的脚本文件名 (默认: train.py)"
     )
     parser_init.set_defaults(func=init_command)
+
+    # === 子命令: version ==
+    parser_version = subparsers.add_parser("version", help="查看版本号")
+    parser_version.set_defaults(func=version_command)
 
     # 解析并执行
     args = parser.parse_args()

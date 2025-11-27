@@ -1,6 +1,6 @@
 from pathlib import Path
 from .templates import TRAIN_TEMPLATE
-
+from .. import __version__
 
 def init_command(args):
     """处理 init 命令的具体逻辑"""
@@ -23,3 +23,6 @@ def init_command(args):
         print(f"✅ 成功生成训练脚本: {target_path}")
     except Exception as e:
         print(f"❌ 生成失败: {e}")
+
+def version_command(args):
+    print(__version__)
