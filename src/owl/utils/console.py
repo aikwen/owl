@@ -8,7 +8,7 @@ LOGO_TEXT = r"""
   ____ _      __/ /
  / __ \ | /| / / /
 / /_/ / |/ |/ / /
-\____/|__/|__/_/
+\____/|__/|__/_/ owl(v{})
 """
 
 def generate_prefix() -> str:
@@ -43,8 +43,9 @@ def welcome():
     打印欢迎词
     """
     from .. import __version__
-    print(f"{Fore.CYAN}{LOGO_TEXT}{Style.RESET_ALL}")
-    highlight("🚀 {} v{} is starting...", "owl engine", __version__, with_prefix=True)
+    logo = LOGO_TEXT.format(__version__)
+    print(f"{Fore.CYAN}{logo}{Style.RESET_ALL}")
+    highlight("🚀 {} is starting...", "owl engine", with_prefix=True)
 
 
 def stop():
