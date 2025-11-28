@@ -4,30 +4,30 @@ from typing import List, Protocol
 import math
 
 @dataclass
-class ConfuseMatrix:
+class ConfusionMatrix:
     TP:torch.Tensor
     TN:torch.Tensor
     FP:torch.Tensor
     FN:torch.Tensor
 
-    def __add__(self, other: 'ConfuseMatrix') -> 'ConfuseMatrix':
-        if not isinstance(other, ConfuseMatrix):
+    def __add__(self, other: 'ConfusionMatrix') -> 'ConfusionMatrix':
+        if not isinstance(other, ConfusionMatrix):
             return NotImplemented
 
-        return ConfuseMatrix(
+        return ConfusionMatrix(
             TP=self.TP + other.TP,
             TN=self.TN + other.TN,
             FP=self.FP + other.FP,
             FN=self.FN + other.FN
         )
 
-    def __iadd__(self, other: 'ConfuseMatrix') -> 'ConfuseMatrix':
+    def __iadd__(self, other: 'ConfusionMatrix') -> 'ConfusionMatrix':
         """
         mat += other
         :param other:
         :return:
         """
-        if not isinstance(other, ConfuseMatrix):
+        if not isinstance(other, ConfusionMatrix):
             return NotImplemented
 
         # 直接修改 self 的属性（Tensor 的加法）
@@ -40,7 +40,7 @@ class ConfuseMatrix:
         return self
 
 
-def f1_score(mat: ConfuseMatrix) -> torch.Tensor:
+def f1_score(mat: ConfusionMatrix) -> torch.Tensor:
     """
     计算 F1 Score。
     不进行 reduce 操作，返回维度与输入 mat 保持一致。
@@ -70,7 +70,7 @@ def to_binary(tensor: torch.Tensor, threshold: float = 0.5, inplace: bool=False)
     tensor[tensor <= threshold] = 0
     return tensor
 
-def confuse_matrix(y_pred:torch.Tensor, y_true: torch.Tensor):
+def calculate_confusion_matrix(y_pred:torch.Tensor, y_true: torch.Tensor):
     """
     计算两个 tensor 之间的混淆矩阵
     注意：输入 y_pred 和 y_true 必须已经是 0/1 的二值矩阵
@@ -92,7 +92,7 @@ def confuse_matrix(y_pred:torch.Tensor, y_true: torch.Tensor):
     y_pred = y_pred.float()
     y_true = y_true.float()
 
-    return ConfuseMatrix(
+    return ConfusionMatrix(
         TP=torch.sum(y_pred * y_true, dim=(1, 2, 3)),
         TN=torch.sum((1 - y_pred) * (1 - y_true), dim=(1, 2, 3)),
         FP=torch.sum(y_pred * (1 - y_true), dim=(1, 2, 3)),
