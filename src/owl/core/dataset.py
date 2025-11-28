@@ -91,4 +91,5 @@ def create_dataloader(dataset_list:List[pathlib.Path],
                       batch_size=batchsize,
                       shuffle=shuffle,
                       num_workers=num_workers,
-                      persistent_workers=(num_workers > 0),)
+                      persistent_workers=(num_workers > 0),
+                      pin_memory=(True if torch.cuda.is_available() else False),)
