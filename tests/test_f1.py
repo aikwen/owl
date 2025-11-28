@@ -2,10 +2,10 @@ import unittest
 import torch
 
 from owl.utils.metrics import (
-    ConfuseMatrix,
+    ConfusionMatrix,
     f1_score,
     to_binary,
-    confuse_matrix,
+    calculate_confusion_matrix,
 )
 
 
@@ -55,7 +55,7 @@ class TestConfuseMatrix(unittest.TestCase):
             ]], dtype=torch.float32
         )
 
-        mat = confuse_matrix(y_pred, y_true)
+        mat = calculate_confusion_matrix(y_pred, y_true)
 
         # 只输入了一张图，TP/TN/FP/FN shape 应该是 [1]
         self.assertEqual(mat.TP.shape, torch.Size([1]))
@@ -90,7 +90,7 @@ class TestConfuseMatrix(unittest.TestCase):
         y_true = torch.stack([y_true1, y_true2], dim=0)  # [2, 1, 2, 2]
         y_pred = torch.stack([y_pred1, y_pred2], dim=0)
 
-        mat = confuse_matrix(y_pred, y_true)
+        mat = calculate_confusion_matrix(y_pred, y_true)
 
         self.assertTrue(torch.equal(mat.TP, torch.tensor([2.0, 0.0])))
         self.assertTrue(torch.equal(mat.TN, torch.tensor([2.0, 0.0])))
@@ -105,7 +105,7 @@ class TestF1Score(unittest.TestCase):
         recall    = 2 / (2+1) = 2/3
         f1        = 2 * p * r / (p + r) = 2/3
         """
-        mat = ConfuseMatrix(
+        mat = ConfusionMatrix(
             TP=torch.tensor([2.0]),
             TN=torch.tensor([3.0]),
             FP=torch.tensor([1.0]),
@@ -119,7 +119,7 @@ class TestF1Score(unittest.TestCase):
         # 两张图：
         # 1) 完美预测 -> F1=1
         # 2) 全错 -> F1=0
-        mat = ConfuseMatrix(
+        mat = ConfusionMatrix(
             TP=torch.tensor([4.0, 0.0]),
             TN=torch.tensor([0.0, 0.0]),
             FP=torch.tensor([0.0, 4.0]),
@@ -132,13 +132,13 @@ class TestF1Score(unittest.TestCase):
 
 class TestConfuseMatrixAdd(unittest.TestCase):
     def test_add_and_iadd(self):
-        mat1 = ConfuseMatrix(
+        mat1 = ConfusionMatrix(
             TP=torch.tensor([1.0]),
             TN=torch.tensor([1.0]),
             FP=torch.tensor([0.0]),
             FN=torch.tensor([0.0]),
         )
-        mat2 = ConfuseMatrix(
+        mat2 = ConfusionMatrix(
             TP=torch.tensor([2.0]),
             TN=torch.tensor([0.0]),
             FP=torch.tensor([1.0]),
