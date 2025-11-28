@@ -29,7 +29,7 @@ class OwlEngine:
         # 是否调用了 build
         self._is_built:bool = False
         # 验证函数
-        self.val_callback: Optional[types.ValCallback] = None
+        self._is_val: bool = False
 
     def config_model(self, model:nn.Module) -> 'OwlEngine':
         """
@@ -49,7 +49,7 @@ class OwlEngine:
         self.status.train_loader = train_loader
         return self
 
-    def config_val(self, val_loader: Dict[str, DataLoader], val_callback: types.ValCallback) -> 'OwlEngine':
+    def config_val(self, val_loader: Dict[str, DataLoader]) -> 'OwlEngine':
         """
         配置验证集数据加载器
         :param val_loader:
@@ -57,7 +57,6 @@ class OwlEngine:
         :return:
         """
         self.status.val_loader = val_loader
-        self.val_callback = val_callback
         return self
 
     def config_epochs(self, epochs:int) -> 'OwlEngine':
@@ -135,11 +134,12 @@ class OwlEngine:
             raise RuntimeError("❌ Engine Build Error: Model 未配置。")
         logger.info("✅ 初始化模型")
 
-        # 检查数据集
+        # 检查训练数据集
         if self.status.train_loader is None:
             raise RuntimeError("❌ Engine Build Error: TrainLoader 未配置。")
-        logger.info(f"✅ 初始化训练数据集: 数量 {len(self.status.train_loader)}")
+        logger.info(f"✅ 初始化训练数据集, 数量: {len(self.status.train_loader)}")
 
+        # 检查验证数据集
         if self.status.val_loader is None or len(self.status.val_loader) == 0:
             logger.warning("⚠️ 未添加验证数据集")
         else:
@@ -171,10 +171,6 @@ class OwlEngine:
         if self.train_mode != TrainMode.TRAIN and self.pre_checkpoint is None:
             raise RuntimeError("❌ Engine Build Error: pre_checkpoint 未配置。")
 
-        # 设置 device
-        self.status.model.to(self.status.device)
-        self.criterion.to(self.status.device)
-        logger.info(f"✅ 当前训练设备：{self.status.device}")
 
         logger.info(f"✅ 当前训练模式：{self.train_mode}")
         # 断点续训
@@ -185,6 +181,11 @@ class OwlEngine:
         elif self.train_mode == TrainMode.FINETUNE:
             self.status.load_state_dict(self.pre_checkpoint, only_model=True)
             logger.info(f"✅ 加载权重成功！")
+
+        # 设置 device
+        self.status.model.to(self.status.device)
+        self.criterion.to(self.status.device)
+        logger.info(f"✅ 当前训练设备：{self.status.device}")
 
         # 创建权重输出文件夹
         if self.autosave:
@@ -245,7 +246,6 @@ class OwlEngine:
             self.build()
 
         logger = file_io.create_logger(self.log_name, "train")
-        logger_val = file_io.create_logger(self.log_name, "val")
         logger.info("✅ 开始训练")
         # 训练
         for epoch in range(self.status.epoch, self.epochs):
@@ -256,9 +256,7 @@ class OwlEngine:
                 self.save_checkpoint()
 
             # 验证
-            if self.status.val_loader is not None and len(self.status.val_loader) > 0 and self.val_callback is not None:
+            if self._is_val:
+                logger_val = file_io.create_logger(self.log_name, "val")
                 self.status.model.eval()
-                self.val_callback(model=self.status.model,
-                                  val_loader=self.status.val_loader,
-                                  logger=logger_val)
 
