@@ -30,6 +30,7 @@ class Metrics(OwlMetrics):
     def __init__(self):
         super().__init__()
 
+    @torch.no_grad()
     def __call__(self, dataloader: DataLoader, model: nn.Module) -> Dict[str, float]:
         return {"f1":0.99, "auc":0.99}
 
