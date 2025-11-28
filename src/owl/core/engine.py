@@ -33,17 +33,26 @@ class OwlEngine:
         self._is_val: bool = False
         # 工厂类
         self.factory: Optional[OwlFactory] = None
+        # 优化设置
+        self.cudnn_benchmark:bool = True
 
     def config_val(self, val_loader: Dict[str, DataLoader]) -> 'OwlEngine':
         """
         配置验证集数据加载器
         :param val_loader:
-        :param val_callback:
         :return:
         """
         self.status.val_loader = val_loader
         return self
 
+    def config_cudnn_benchmark(self, o: bool=True) -> 'OwlEngine':
+        """
+        为整个网络的每个卷积层搜索最适合它的卷积实现算法，实现网络的加速。
+        :param o: True 表示打开，默认值是 True
+        :return:
+        """
+        self.cudnn_benchmark = o
+        return self
 
     def config_factory(self, factory: OwlFactory) -> 'OwlEngine':
         """
@@ -232,6 +241,10 @@ class OwlEngine:
             self.build()
 
         logger = file_io.create_logger(self.log_name, "train")
+        # 训练之前的优化
+        if torch.cuda.is_available() and self.cudnn_benchmark:
+            torch.backends.cudnn.benchmark = True
+
         logger.info("✅ 开始训练")
         # 训练
         for epoch in range(self.status.epoch, self.epochs):
