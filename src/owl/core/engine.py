@@ -125,7 +125,7 @@ class OwlEngine:
         if not _welcome_is_print:
             console.welcome()
             _welcome_is_print = True
-        # 检查是否设置了日志输出和权重输出文件
+        # 检查是否设置了日志输出文件
         if self.log_name == "":
             raise RuntimeError("❌ Engine Build Error: 日志文件名未配置。")
         logger = file_io.create_logger(self.log_name, "train")
@@ -138,29 +138,29 @@ class OwlEngine:
         # 检查数据集
         if self.status.train_loader is None:
             raise RuntimeError("❌ Engine Build Error: TrainLoader 未配置。")
-        logger.info("✅ 初始化训练数据集")
+        logger.info(f"✅ 初始化训练数据集: 数量 {len(self.status.train_loader)}")
 
         if self.status.val_loader is None or len(self.status.val_loader) == 0:
-            logger.warning("❌ 未添加验证数据集")
+            logger.warning("⚠️ 未添加验证数据集")
         else:
-            logger.info(f"✅ 初始化验证数据集：{[name for name in self.status.val_loader.keys()]}")
+            logger.info(f"✅ 初始化验证数据集: {[name for name in self.status.val_loader.keys()]}")
 
         # 检查 epoch
         if self.epochs <= 0:
             raise RuntimeError("❌ Engine Build Error: epochs 必须大于等于 0")
-        logger.info("✅ 初始化epoch")
+        logger.info(f"✅ 初始化epoch: {self.epochs}")
 
         # 检查优化器
         if self.status.optimizer is None:
             raise RuntimeError("❌ Engine Build Error: Optimizer 未配置。")
-        logger.info("✅ 初始化优化器")
+        logger.info(f"✅ 初始化优化器,初始化学习率: {self.status.optimizer.param_groups[0]['lr']:.8f}")
 
         # 检查学习率优化器
         if self.status.scheduler is None:
             # 可以没有学习率优化器，暂时先 pass， 后续写到日志里面
-            logger.warning("❌ 学习率优化器未设置")
+            logger.warning("⚠️ 学习率优化器未设置")
         else:
-            logger.info("✅ 初始化学习率优化器")
+            logger.info(f"✅ 初始化学习率优化器")
 
         # 检查损失函数
         if self.criterion is None:
@@ -192,7 +192,7 @@ class OwlEngine:
                 raise RuntimeError("❌ Engine Build Error: 权重文件夹未配置。")
             file_io.create_dir(self.checkpoint_dir)
             logger.info(f"✅ 权重保存目录：{self.checkpoint_dir}")
-        logger.info(f"{'✅' if self.autosave else '❌'} 权重自动保存：{self.autosave}")
+        logger.info(f"{'✅' if self.autosave else '⚠️'} 权重自动保存：{self.autosave}")
 
         # build 结束
         self._is_built = True
