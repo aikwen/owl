@@ -4,14 +4,14 @@ import torch
 from pathlib import Path
 
 from typing import  Optional, Any, Dict
-from ..utils import types
-from ..utils import file_io
+from ..utils import types, file_io, console
 from ..utils.types import TrainMode
 from .status import Status
 
+_welcome_is_print:bool = False
 
 class OwlEngine:
-    def __init__(self):
+    def __init__(self, log_name:str):
         # 全局上下文
         self.status:Status = Status()
         # 训练 epochs 数
@@ -23,7 +23,7 @@ class OwlEngine:
         self.pre_checkpoint:Optional[Dict[str, Any]] = None
         # 输出权重文件夹名和日志名
         self.checkpoint_dir:str = ""
-        self.log_name: str = ""
+        self.log_name: str = log_name
         # 是否在每个 epoch 保存 checkpoint
         self.autosave: bool = True
         # 是否调用了 build
@@ -104,23 +104,14 @@ class OwlEngine:
             self.pre_checkpoint = pre_checkpoint
         return self
 
-    def config_output(self, checkpoint_dir:str, log_name:str) -> 'OwlEngine':
+    def config_checkpoints(self, checkpoint_dir:str, autosave:bool=True) -> 'OwlEngine':
         """
-        设置权重输出文件夹 和 日志文件名
-        :param checkpoint_dir:
-        :param log_name:
+        设置权重输出文件夹名称和是否自动保存
+        :param checkpoint_dir: 权重输出文件夹名称，不存在会自动创建
+        :param autosave: 是否在每个 epoch 后自动保存
         :return:
         """
         self.checkpoint_dir = checkpoint_dir
-        self.log_name = log_name
-        return self
-
-    def config_autosave(self, autosave:bool) -> 'OwlEngine':
-        """
-        设置是否自动保存权重
-        :param autosave:
-        :return:
-        """
         self.autosave = autosave
         return self
 
@@ -129,6 +120,11 @@ class OwlEngine:
         构造整个 engine
         :return:
         """
+        # 打印欢迎词
+        global _welcome_is_print
+        if not _welcome_is_print:
+            console.welcome()
+            _welcome_is_print = True
         # 检查是否设置了日志输出和权重输出文件
         if self.log_name == "":
             raise RuntimeError("❌ Engine Build Error: 日志文件名未配置。")
@@ -207,7 +203,6 @@ class OwlEngine:
         filename = f"epoch_{self.status.epoch:03d}.pth"
         save_path = Path(self.checkpoint_dir) / filename
         torch.save(self.status.state_dict(), save_path)
-
 
     def train_one_epoch(self):
         logger = file_io.create_logger(self.log_name, "train")
