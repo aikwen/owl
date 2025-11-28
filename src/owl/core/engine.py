@@ -1,12 +1,11 @@
-from torch.utils.data import DataLoader
 from torch import nn
 import torch
 from pathlib import Path
+from prettytable import PrettyTable
 
-from typing import  Optional, Any, Dict
-from ..utils import types, file_io, console
-from ..utils.types import TrainMode, OwlFactory
-from ..utils import validator
+from typing import  Optional, Any, Dict, List
+from ..utils import types, file_io, console, validator
+from ..utils.types import TrainMode, OwlFactory, OwlMetrics
 from .status import Status
 
 _welcome_is_print:bool = False
@@ -29,21 +28,13 @@ class OwlEngine:
         self.autosave: bool = True
         # 是否调用了 build
         self._is_built:bool = False
-        # 验证函数
+        # 验证类
         self._is_val: bool = False
+        self.val_metrics: Optional[OwlMetrics] = None
         # 工厂类
         self.factory: Optional[OwlFactory] = None
         # 优化设置
         self.cudnn_benchmark:bool = True
-
-    def config_val(self, val_loader: Dict[str, DataLoader]) -> 'OwlEngine':
-        """
-        配置验证集数据加载器
-        :param val_loader:
-        :return:
-        """
-        self.status.val_loader = val_loader
-        return self
 
     def config_cudnn_benchmark(self, o: bool=True) -> 'OwlEngine':
         """
@@ -117,7 +108,7 @@ class OwlEngine:
 
         # 检查是否设置了日志输出文件
         validator.check(self.log_name != "", "❌ Engine Build Error: 日志文件名未配置。")
-        logger = file_io.create_logger(self.log_name, "train")
+        logger = file_io.get_logger(self.log_name, "train")
         # 打印当前设备
         logger.info(f"✅ 当前训练设备：{self.status.device}")
         # ========= 组装模型 ========
@@ -175,11 +166,16 @@ class OwlEngine:
             logger.info(f"✅ 加载权重成功！")
 
         # 检查验证数据集
-        self.status.val_loader = self.factory.create_val_dataloader()
+        self.status.val_loader, self.val_metrics = self.factory.create_val_dataloader()
         if self.status.val_loader is None or len(self.status.val_loader) == 0:
             logger.warning("⚠️ 未添加验证数据集")
         else:
             logger.info(f"✅ 初始化验证数据集: {[name for name in self.status.val_loader.keys()]}")
+            if self.val_metrics is None:
+                logger.warning("⚠️ 未添加验证类")
+            else:
+                logger.info(f"✅ 初始化验证函类")
+                self._is_val = True
 
         # ========= 组装结束 ========
 
@@ -201,7 +197,7 @@ class OwlEngine:
         torch.save(self.status.state_dict(), save_path)
 
     def train_one_epoch(self):
-        logger = file_io.create_logger(self.log_name, "train")
+        logger = file_io.get_logger(self.log_name, "train")
         # 转为训练模式
         self.status.model.train()
         loader = self.status.train_loader
@@ -243,7 +239,7 @@ class OwlEngine:
         if not self._is_built:
             self.build()
 
-        logger = file_io.create_logger(self.log_name, "train")
+        logger = file_io.get_logger(self.log_name, "train")
         # 训练之前的优化
         if torch.cuda.is_available() and self.cudnn_benchmark:
             torch.backends.cudnn.benchmark = True
@@ -259,6 +255,31 @@ class OwlEngine:
 
             # 验证
             if self._is_val:
-                logger_val = file_io.create_logger(self.log_name, "val")
+                logger_val = file_io.get_logger(self.log_name, "val", is_format=False)
                 self.status.model.eval()
-
+                # 指标类型
+                metrics_types = set()
+                row_data:List[Dict[str, Any]] = []
+                for name, dataloader in self.status.val_loader.items():
+                    res = self.val_metrics(dataloader=dataloader,
+                                     model=self.status.model,)
+                    metrics_types.update(res.keys())
+                    row_data.append({"dataset": name, "metrics": res})
+                # 日志文件
+                headers = ["dataset"]
+                # 获取所有的指标类型
+                metrics_types_list = sorted(metrics_types)
+                headers.extend(metrics_types_list)
+                tb = PrettyTable(headers)
+                for row in row_data:
+                    li = [row["dataset"]]
+                    # 添加每个数据
+                    for m in metrics_types_list:
+                        value = row['metrics'].get(m, "")
+                        if isinstance(value, float):
+                            value = f"{value:.4f}"
+                        li.append(value)
+                    tb.add_row(li)
+                # 打印到日志
+                logger_val.info(f"Epoch: {epoch+1}")
+                logger_val.info(tb)
