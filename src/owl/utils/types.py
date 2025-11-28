@@ -1,12 +1,63 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Protocol, Dict
+from typing import Optional, Any, Dict
 import torch.nn as nn
 from torch.utils.data import DataLoader
-import logging
+from torch import optim
 
 
+class OwlFactory(ABC):
+    @abstractmethod
+    def create_model(self) -> nn.Module:
+        """
+        返回模型实例
+        :return:
+        """
+        ...
+
+    @abstractmethod
+    def create_optimizer(self, model:nn.Module) -> optim.Optimizer:
+        """
+        根据 model 创建并返回优化器实例。
+        :param model:
+        :return:
+        """
+        ...
+
+    @abstractmethod
+    def create_scheduler(self, optimizer: optim.Optimizer, epochs:int, batches:int) -> Optional[Any]:
+        """
+        根据 optimizer等参数 创建并返回学习率调度器。
+        :param optimizer: 优化器
+        :param epochs: 总的 epoch 数量
+        :param batches: 每个 epoch 有多少个 batch
+        :return:
+        """
+        ...
+
+    @abstractmethod
+    def create_train_dataloader(self) -> DataLoader:
+        """
+        返回训练数据集
+        :return:
+        """
+        ...
+
+    def create_val_dataloader(self) -> Optional[Dict[str, DataLoader]]:
+        """
+        返回验证数据集
+        :return:
+        """
+        return None
+
+    @abstractmethod
+    def create_criterion(self) -> nn.Module:
+        """
+
+        :return:
+        """
+        ...
 
 class TrainMode(Enum):
     TRAIN = "train"       # 从头训练 (Scratch)
