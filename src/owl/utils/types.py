@@ -59,6 +59,19 @@ class OwlFactory(ABC):
         """
         ...
 
+class OwlMetrics(ABC):
+    @abstractmethod
+    def __call__(self, dataloader: DataLoader, model: nn.Module) -> Dict[str, float]:
+        """
+        计算某个数据集的指标
+        无需设置 model.eval()
+        :param dataloader:
+        :param model:
+        :return: 比如 {"F1": 0.7, "auc": 0.9}
+        """
+        ...
+
+
 class TrainMode(Enum):
     TRAIN = "train"       # 从头训练 (Scratch)
     RESUME = "resume"     # 断点续训 (Resume Full State)
