@@ -17,7 +17,8 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    "colorama>=0.4.5"
+    "colorama>=0.4.5",
+    "prettytable>=3.17.0",
 ]
 
 [project.scripts]
