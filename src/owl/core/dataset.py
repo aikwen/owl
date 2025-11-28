@@ -87,4 +87,8 @@ def create_dataloader(dataset_list:List[pathlib.Path],
     for path in dataset_list:
         datasets.append(ImageDataset(path, transform=transform))
     combined_dataset = ConcatDataset(datasets)
-    return DataLoader(combined_dataset, batch_size=batchsize, shuffle=shuffle, num_workers=num_workers)
+    return DataLoader(combined_dataset,
+                      batch_size=batchsize,
+                      shuffle=shuffle,
+                      num_workers=num_workers,
+                      persistent_workers=(num_workers > 0),)
