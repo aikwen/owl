@@ -58,11 +58,20 @@ def create_dir(path: Union[str, Path]) -> None:
     except Exception as e:
         raise RuntimeError(f"Error: 无法创建输出目录。Error: {e}")
 
-def create_logger(
+def get_logger(
                 log_file: str,
                 mode: str,
+                is_format: bool = True,
                 level: int = logging.INFO,
                 ) -> logging.Logger:
+    """
+    获取某个文件的 logger 句柄，如果不存在就会创建
+    :param log_file:
+    :param mode: 日志等级（同一 log_file + mode 组合仅第一次调用真正影响 handler）
+    :param is_format: 只有第一次调用生效
+    :param level:
+    :return:
+    """
     p = Path(f"{log_file}_{mode}.log")
     logger = logging.getLogger(str(p.resolve()))
     logger.setLevel(level)
@@ -75,10 +84,14 @@ def create_logger(
         fh = logging.FileHandler(p, encoding="utf-8")
         fh.setLevel(level)
 
-        formatter = logging.Formatter(
-            fmt="%(asctime)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        if is_format:
+            formatter = logging.Formatter(
+                fmt="%(asctime)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        else:
+            # “没有 format”：只输出 message 本身
+            formatter = logging.Formatter(fmt="%(message)s")
         fh.setFormatter(formatter)
 
         logger.addHandler(fh)
