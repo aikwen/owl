@@ -1,11 +1,22 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Tuple
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch import optim
 
+class OwlMetrics(ABC):
+    @abstractmethod
+    def __call__(self, dataloader: DataLoader, model: nn.Module) -> Dict[str, float]:
+        """
+        计算某个数据集的指标
+        无需设置 model.eval()
+        :param dataloader:
+        :param model:
+        :return: 比如 {"F1": 0.7, "auc": 0.9}
+        """
+        ...
 
 class OwlFactory(ABC):
     @abstractmethod
@@ -44,12 +55,14 @@ class OwlFactory(ABC):
         """
         ...
 
-    def create_val_dataloader(self) -> Optional[Dict[str, DataLoader]]:
+    @abstractmethod
+    def create_val_dataloader(self) -> Tuple[Optional[Dict[str, DataLoader]],
+                                       Optional[OwlMetrics]]:
         """
-        返回验证数据集
+        返回验证数据集和指标计算类
         :return:
         """
-        return None
+        return None, None
 
     @abstractmethod
     def create_criterion(self) -> nn.Module:
@@ -59,17 +72,6 @@ class OwlFactory(ABC):
         """
         ...
 
-class OwlMetrics(ABC):
-    @abstractmethod
-    def __call__(self, dataloader: DataLoader, model: nn.Module) -> Dict[str, float]:
-        """
-        计算某个数据集的指标
-        无需设置 model.eval()
-        :param dataloader:
-        :param model:
-        :return: 比如 {"F1": 0.7, "auc": 0.9}
-        """
-        ...
 
 
 class TrainMode(Enum):
