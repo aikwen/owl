@@ -82,6 +82,8 @@ def create_dataloader(dataset_list:List[pathlib.Path],
                     batchsize:int,
                     num_workers:int=0,
                     shuffle:bool=True,
+                    pin_memory: bool=True,
+                    persistent_workers:bool=True,
                     )-> DataLoader:
     datasets = []
     for path in dataset_list:
@@ -91,5 +93,5 @@ def create_dataloader(dataset_list:List[pathlib.Path],
                       batch_size=batchsize,
                       shuffle=shuffle,
                       num_workers=num_workers,
-                      persistent_workers=(num_workers > 0),
-                      pin_memory=(True if torch.cuda.is_available() else False),)
+                      persistent_workers=(num_workers > 0) and persistent_workers,
+                      pin_memory=(pin_memory if torch.cuda.is_available() else False),)
