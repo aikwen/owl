@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Union
+from typing import Union, Any, List
 
 
 def data_protocol(path: Union[str, Path]) -> Path:
@@ -43,3 +43,7 @@ def data_protocol(path: Union[str, Path]) -> Path:
         raise ValueError(f"读取 JSON 文件失败: {json_file.name} -> {e}")
 
     return p
+
+def check(ok: bool, error_msg:str):
+    if not ok:
+        raise RuntimeError(error_msg)
