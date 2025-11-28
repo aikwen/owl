@@ -1,5 +1,5 @@
 TRAIN_TEMPLATE = """
-from typing import Optional, Any
+from typing import Optional, Any, Tuple, Dict
 import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader
@@ -7,6 +7,7 @@ from pathlib import Path
 
 from owl.core import engine, dataset
 from owl.utils import types, img_aug
+from owl.utils.types import OwlMetrics
 
 # 模型定义
 class SimpleModel(nn.Module):
@@ -24,6 +25,13 @@ class Criterion(nn.Module):
     def forward(self, outputs, target):
         return self.loss(outputs, target)
 
+# 定义指标计算
+class Metrics(OwlMetrics):
+    def __init__(self):
+        super().__init__()
+
+    def __call__(self, dataloader: DataLoader, model: nn.Module) -> Dict[str, float]:
+        return {"f1":0.99, "auc":0.99}
 
 class Factory(types.OwlFactory):
     def __init__(self):
@@ -94,14 +102,45 @@ class Factory(types.OwlFactory):
         )
         return dataloader_train
 
+    def create_val_dataloader(self) -> Tuple[Optional[Dict[str, DataLoader]],
+                                            Optional[OwlMetrics]]:
+        # -------------------------------------------------------------------------
+        # 配置验证数据集
+        # -------------------------------------------------------------------------
+        batch_size = 1
+        num_workers = 1
+        shuffle = False
+        transform_pipeline_val = [
+            types.ResizeConfig(width=512, height=512, p=1),
+        ]
+        # 验证数据集有哪些
+        datasets_val = [
+            [Path('example')],
+            [Path('example')],
+            [Path('example')],
+            [Path('example')],
+        ]
+        # 创建验证数据集 dataloader 字典
+        val_dataloaders_dict:Dict[str, DataLoader] = {}
 
+        for i, ds in enumerate(datasets_val):
+            val_dataloaders_dict[f"{i}"] = \\
+                dataset.create_dataloader(
+                        dataset_list=ds,
+                        transform=img_aug.aug_compose(transform_pipeline_val),
+                        batchsize=batch_size,
+                        num_workers=num_workers,
+                        shuffle=shuffle,
+                )
+
+        return val_dataloaders_dict, Metrics()
 
 def main():
     # -------------------------------------------------------------------------
     # 运行, 初始化引擎
     # -------------------------------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    epochs = 2
+    epochs = 5
     e = (engine.OwlEngine(log_name="model_v1")
         # 配置工厂
         .config_factory(factory=Factory())
