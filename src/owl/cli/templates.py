@@ -81,10 +81,10 @@ def main():
     
     
     # -------------------------------------------------------------------------
-    # 运行
+    # 运行, 初始化引擎
     # -------------------------------------------------------------------------
 
-    e = (engine.OwlEngine()
+    e = (engine.OwlEngine(log_name="model_v1")
         # 配置模型
         .config_model(model)
         # 配置数据集
@@ -96,9 +96,8 @@ def main():
         .config_loss(criterion)
         # 配置训练 epochs
         .config_epochs(epochs)
-        # 配置日志和权重保存策略和保存目录
-        .config_output(checkpoint_dir="checkpoints", log_name="model_v1")
-        .config_autosave(autosave=True) 
+        # 配置权重保存目录和保存策略
+        .config_checkpoints(checkpoint_dir="checkpoints", autosave=True)
         # 配置训练模式 TRAIN 从0开始, RESUME 断点续训, 
         .config_train_mode(types.TrainMode.TRAIN) 
         # 配置训练设备
