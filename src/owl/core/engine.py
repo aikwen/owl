@@ -209,6 +209,7 @@ class OwlEngine:
         interval_loss = 0.0
         total_batches = len(loader)
         batches_width = len(str(total_batches))
+        pre_record = 0
         for i, batch in enumerate(loader, start=1):
             tp, gt, _, _ = batch
             tp = tp.to(self.status.device)
@@ -226,15 +227,17 @@ class OwlEngine:
 
             interval_loss += loss.item()
             # 每 10 轮打印平均损失和当前的学习率
-            if i % 10 == 0:
+            if i % 10 == 0 or i == total_batches:
+                cnt = i - pre_record
+                avg_loss = interval_loss / cnt
                 cur_lr = f"{self.status.optimizer.param_groups[0]['lr']:.8f}"
-                avg_loss = interval_loss / 10
                 logger.info(f"Epoch [{self.status.epoch:03d}/{self.epochs}] | "
                             f"Batch [{i:>{batches_width}}/{total_batches}] | "
                             f"Loss {avg_loss:.6f} | LR {cur_lr}")
 
                 # 清空这10轮的损失
                 interval_loss = 0.0
+                pre_record = i
 
     def train(self):
         if not self._is_built:
