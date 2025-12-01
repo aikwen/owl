@@ -49,10 +49,12 @@ class ImageDataset(Dataset):
 
         # 加载tp 和 gt 图像
         tp_image:Image.Image = file_io.load_image(tp_img_path)
+        gt_image:Image.Image
+
         if gt_img_path is  None:
-            gt_image:Image.Image = Image.new("L", tp_image.size, 0)
+            gt_image = Image.new("L", tp_image.size, 0)
         else:
-            gt_image:Image.Image = file_io.load_image(gt_img_path).convert("L")
+            gt_image = file_io.load_image(gt_img_path).convert("L")
 
         # 获取图像矩阵
         tp_array = img_op.to_numpy(tp_image, ensure_rgb=True)
