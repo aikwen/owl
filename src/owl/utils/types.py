@@ -37,7 +37,7 @@ class OwlFactory(ABC):
         ...
 
     @abstractmethod
-    def create_scheduler(self, optimizer: optim.Optimizer, epochs:int, batches:int) -> Optional[Any]:
+    def create_scheduler(self, optimizer: optim.Optimizer, epochs:int, batches:int) -> Any | None:
         """
         根据 optimizer等参数 创建并返回学习率调度器。
         :param optimizer: 优化器

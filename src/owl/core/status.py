@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Any, Dict
+from typing import Any, Dict
 import torch
 from torch.utils.data import DataLoader
 
@@ -12,14 +12,14 @@ class Status:
     # 当前是第几个 epoch
     epoch: int = 0
     # 模型
-    model: Optional[torch.nn.Module] = None
+    model: torch.nn.Module | None = None
     # 优化器
-    optimizer: Optional[torch.optim.Optimizer] = None
+    optimizer: torch.optim.Optimizer | None = None
     # 学习率优化器
-    scheduler: Optional[Any] = None
+    scheduler: Any | None = None
     # 数据集
-    train_loader: Optional[DataLoader] = None
-    val_loader: Optional[Dict[str, DataLoader]] = None
+    train_loader: DataLoader | None = None
+    val_loader: Dict[str, DataLoader] | None = None
     # device default cpu
     device: torch.device = torch.device("cpu")
 
@@ -45,10 +45,12 @@ class Status:
             return
 
         # 恢复 Epoch
-        if checkpoint.get("epoch", None) is not None:
-            self.epoch = checkpoint.get("epoch") + 1
+        epoch = checkpoint.get("epoch", None)
+        if epoch is not None:
+            self.epoch = epoch + 1
         else:
             self.epoch = 0
+
         # 恢复组件
         if self.model and "model_state" in checkpoint:
             self.model.load_state_dict(checkpoint["model_state"])
