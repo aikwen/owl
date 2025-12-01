@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional, Any, Dict, Tuple
+from typing import  Any, Dict
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch import optim
@@ -18,6 +18,14 @@ class OwlMetrics(ABC):
         """
         ...
 
+@dataclass
+class ValConfig:
+    """
+    验证相关的配置类
+    """
+    val_datasets: Dict[str, DataLoader]
+    owlMetrics: OwlMetrics
+
 class OwlFactory(ABC):
     @abstractmethod
     def create_model(self) -> nn.Module:
@@ -27,6 +35,19 @@ class OwlFactory(ABC):
         """
         ...
 
+    @abstractmethod
+    def create_val_dataloader(self) -> ValConfig | None:
+        """
+        返回验证数据集配置
+        Returns:
+            ValConfig | None:
+        """
+        return None
+
+class OwlTrainFactory(OwlFactory):
+    """
+    训练相关的 Factory 基类
+    """
     @abstractmethod
     def create_optimizer(self, model:nn.Module) -> optim.Optimizer:
         """
@@ -56,23 +77,12 @@ class OwlFactory(ABC):
         ...
 
     @abstractmethod
-    def create_val_dataloader(self) -> Tuple[Optional[Dict[str, DataLoader]],
-                                       Optional[OwlMetrics]]:
-        """
-        返回验证数据集和指标计算类
-        :return:
-        """
-        return None, None
-
-    @abstractmethod
     def create_criterion(self) -> nn.Module:
         """
-
+        返回损失函数
         :return:
         """
         ...
-
-
 
 class TrainMode(Enum):
     TRAIN = "train"       # 从头训练 (Scratch)
@@ -132,10 +142,10 @@ class JpegConfig(BaseAugConfig):
     def __post_init__(self):
         super().__post_init__()
         if self.quality_low > self.quality_high:
-            raise ValueError(f"quality_low 应该小于 quality_high")
+            raise ValueError("quality_low 应该小于 quality_high")
 
         if self.quality_high > 100 or self.quality_low < 0:
-            raise ValueError(f"quality_high 和 quality_low 范围是[0, 100]")
+            raise ValueError("quality_high 和 quality_low 范围是[0, 100]")
 
 @dataclass
 class GblurConfig(BaseAugConfig):

@@ -5,7 +5,7 @@ from prettytable import PrettyTable
 
 from typing import  Optional, Any, Dict, List
 from ..utils import types, file_io, console, validator
-from ..utils.types import TrainMode, OwlFactory, OwlMetrics
+from ..utils.types import TrainMode, OwlFactory, OwlMetrics, OwlTrainFactory
 from .status import Status
 
 _welcome_is_print:bool = False
@@ -32,7 +32,7 @@ class OwlEngine:
         self._is_val: bool = False
         self.val_metrics: Optional[OwlMetrics] = None
         # 工厂类
-        self.factory: Optional[OwlFactory] = None
+        self.factory: Optional[OwlTrainFactory] = None
         # 优化设置
         self.cudnn_benchmark:bool = True
 
@@ -45,7 +45,7 @@ class OwlEngine:
         self.cudnn_benchmark = o
         return self
 
-    def config_factory(self, factory: OwlFactory) -> 'OwlEngine':
+    def config_factory(self, factory: OwlTrainFactory) -> 'OwlEngine':
         """
         工厂
         :param factory:
@@ -139,7 +139,7 @@ class OwlEngine:
         # 创建优化器
         self.status.optimizer = self.factory.create_optimizer(self.status.model)
         validator.check(self.status.optimizer is not None, "❌ Engine Build Error: Optimizer 未正确初始化。")
-        logger.info("✅ 初始化优化器")
+        logger.info(f"✅ 初始化优化器:{self.status.optimizer.param_groups[0]['lr']:.8f}")
 
         # 创建学习率调整器
         self.status.scheduler = self.factory.create_scheduler(optimizer=self.status.optimizer,
@@ -166,16 +166,14 @@ class OwlEngine:
             logger.info("✅ 加载权重成功！")
 
         # 检查验证数据集
-        self.status.val_loader, self.val_metrics = self.factory.create_val_dataloader()
-        if self.status.val_loader is None or len(self.status.val_loader) == 0:
-            logger.warning("⚠️ 未添加验证数据集")
+        valconfig = self.factory.create_val_dataloader()
+        if valconfig is None:
+            logger.warning("⚠️ 未添加验证数据集 | 验证类")
         else:
+            self.status.val_loader, self.val_metrics = valconfig.val_datasets, valconfig.owlMetrics
             logger.info(f"✅ 初始化验证数据集: {[name for name in self.status.val_loader.keys()]}")
-            if self.val_metrics is None:
-                logger.warning("⚠️ 未添加验证类")
-            else:
-                logger.info("✅ 初始化验证函类")
-                self._is_val = True
+            logger.info("✅ 初始化验证函类")
+            self._is_val = True
 
         # ========= 组装结束 ========
 
@@ -227,7 +225,7 @@ class OwlEngine:
                 cnt = i - pre_record
                 avg_loss = interval_loss / cnt
                 cur_lr = f"{self.status.optimizer.param_groups[0]['lr']:.8f}"
-                logger.info(f"Epoch [{self.status.epoch:03d}/{self.epochs}] | "
+                logger.info(f"Epoch [{self.status.epoch+1:03d}/{self.epochs}] | "
                             f"Batch [{i:>{batches_width}}/{total_batches}] | "
                             f"Loss {avg_loss:.6f} | LR {cur_lr}")
 
