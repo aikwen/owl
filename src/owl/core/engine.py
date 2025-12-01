@@ -139,7 +139,7 @@ class OwlEngine:
         # 创建优化器
         self.status.optimizer = self.factory.create_optimizer(self.status.model)
         validator.check(self.status.optimizer is not None, "❌ Engine Build Error: Optimizer 未正确初始化。")
-        logger.info(f"✅ 初始化优化器")
+        logger.info("✅ 初始化优化器")
 
         # 创建学习率调整器
         self.status.scheduler = self.factory.create_scheduler(optimizer=self.status.optimizer,
@@ -148,7 +148,7 @@ class OwlEngine:
         if self.status.scheduler is None:
             logger.warning("⚠️ 学习率调整器未设置")
         else:
-            logger.info(f"✅ 初始化学习率调整器")
+            logger.info("✅ 初始化学习率调整器")
 
         # 检查训练模式：当训练模式是断点续训或微调的时候，检查是否提供权重文件
         logger.info(f"✅ 当前训练模式：{self.train_mode}")
@@ -159,11 +159,11 @@ class OwlEngine:
         # 断点续训
         if self.train_mode == TrainMode.RESUME:
             self.status.load_state_dict(self.pre_checkpoint, only_model=False)
-            logger.info(f"✅ 加载权重成功！")
+            logger.info("✅ 加载权重成功！")
         # 迁移学习
         elif self.train_mode == TrainMode.FINETUNE:
             self.status.load_state_dict(self.pre_checkpoint, only_model=True)
-            logger.info(f"✅ 加载权重成功！")
+            logger.info("✅ 加载权重成功！")
 
         # 检查验证数据集
         self.status.val_loader, self.val_metrics = self.factory.create_val_dataloader()
@@ -174,7 +174,7 @@ class OwlEngine:
             if self.val_metrics is None:
                 logger.warning("⚠️ 未添加验证类")
             else:
-                logger.info(f"✅ 初始化验证函类")
+                logger.info("✅ 初始化验证函类")
                 self._is_val = True
 
         # ========= 组装结束 ========
