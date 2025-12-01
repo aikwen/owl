@@ -1,5 +1,5 @@
 TRAIN_TEMPLATE = """
-from typing import Optional, Any, Tuple, Dict
+from typing import Any, Dict
 import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader
@@ -34,7 +34,7 @@ class Metrics(OwlMetrics):
     def __call__(self, dataloader: DataLoader, model: nn.Module) -> Dict[str, float]:
         return {"f1":0.99, "auc":0.99}
 
-class Factory(types.OwlFactory):
+class Factory(types.OwlTrainFactory):
     def __init__(self):
         super().__init__()
 
@@ -58,7 +58,7 @@ class Factory(types.OwlFactory):
         weight_decay = 0.01
         return optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    def create_scheduler(self, optimizer: optim.Optimizer, epochs: int, batches: int) -> Optional[Any]:
+    def create_scheduler(self, optimizer: optim.Optimizer, epochs: int, batches: int) -> Any | None:
         # -------------------------------------------------------------------------
         # 配置学习率优化器
         # -------------------------------------------------------------------------
@@ -103,8 +103,7 @@ class Factory(types.OwlFactory):
         )
         return dataloader_train
 
-    def create_val_dataloader(self) -> Tuple[Optional[Dict[str, DataLoader]],
-                                            Optional[OwlMetrics]]:
+    def create_val_dataloader(self) -> types.ValConfig:
         # -------------------------------------------------------------------------
         # 配置验证数据集
         # -------------------------------------------------------------------------
@@ -134,7 +133,11 @@ class Factory(types.OwlFactory):
                         shuffle=shuffle,
                 )
 
-        return val_dataloaders_dict, Metrics()
+        return types.ValConfig(
+            val_datasets=val_dataloaders_dict,
+            owlMetrics=Metrics()
+        )
+
 
 def main():
     # -------------------------------------------------------------------------
@@ -149,8 +152,8 @@ def main():
         .config_epochs(epochs)
         # 配置权重保存目录和保存策略
         .config_checkpoints(checkpoint_dir="checkpoints", autosave=True)
-        # 配置训练模式 TRAIN 从0开始, RESUME 断点续训, 
-        .config_train_mode(types.TrainMode.TRAIN) 
+        # 配置训练模式 TRAIN 从0开始, RESUME 断点续训,
+        .config_train_mode(types.TrainMode.TRAIN)
         # 配置训练设备
         .config_device(device)
         # 构建
