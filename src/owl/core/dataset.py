@@ -1,12 +1,24 @@
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataset import ConcatDataset
-from typing import Union, Dict, List, Optional
+from typing import Union, List, Optional
 import albumentations as albu
 import pathlib
 import torch
+from typing_extensions import TypedDict
 from ..utils import validator, file_io, img_op, img_aug, types
 
+class DataSetItem(TypedDict):
+    tp_tensor: torch.Tensor
+    gt_tensor: torch.Tensor
+    tp_name: str
+    gt_name: str
+
+class DataSetBatch(TypedDict):
+    tp_tensor: torch.Tensor  # [B, 3, H, W]
+    gt_tensor: torch.Tensor  # [B, 1, H, W]
+    tp_name: list[str]
+    gt_name: list[str]
 
 class ImageDataset(Dataset):
     """
@@ -24,14 +36,14 @@ class ImageDataset(Dataset):
         # 数据集路径
         self.path = validator.data_protocol(path)
         # 数据集列表
-        self.dataset_list: List[Dict] = file_io.load_json(self.path / f"{self.path.name}.json")
+        self.dataset_list: List[dict] = file_io.load_json(self.path / f"{self.path.name}.json")
         # 数据集要做的变换
         self.transform = transform
 
     def __len__(self):
         return len(self.dataset_list)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> DataSetItem:
         """
         Args:
             idx (int): 对应的下标
@@ -74,10 +86,12 @@ class ImageDataset(Dataset):
         gt_tensor = torch.from_numpy(gt_array).to(torch.float32).unsqueeze(0)
         tp_name = tp_img_path.name
         gt_name = gt_img_path.name if gt_img_path is not None else ""
-        return (tp_tensor,
-                gt_tensor,
-                tp_name,
-                gt_name)
+        return DataSetItem(
+            tp_tensor=tp_tensor,
+            gt_tensor=gt_tensor,
+            tp_name=tp_name,
+            gt_name=gt_name,
+        )
 
 
 def create_dataloader(dataset_list: List[pathlib.Path],
@@ -100,7 +114,7 @@ def create_dataloader(dataset_list: List[pathlib.Path],
                       pin_memory=(pin_memory if torch.cuda.is_available() else False), )
 
 class OwlDataloader:
-    def __init__(self, datasets_map: Dict[str, pathlib.Path],
+    def __init__(self, datasets_map: dict[str, pathlib.Path],
                  transform_pipline: List[types.BaseAugConfig],
                  batch_size: int,
                  num_workers: int,
@@ -116,7 +130,7 @@ class OwlDataloader:
         :param pin_memory:
         :param persistent_workers:
         """
-        self.datasets_map: Dict[str, pathlib.Path] = datasets_map
+        self.datasets_map: dict[str, pathlib.Path] = datasets_map
         self.transform_pipline: List[types.BaseAugConfig] = transform_pipline
         self.batch_size: int = batch_size
         self.num_worker: int = num_workers
@@ -137,8 +151,8 @@ class OwlDataloader:
         )
         return dataloader_train
 
-    def build_dataloader_test(self) -> Dict[str, DataLoader]:
-        dataloader_test: Dict[str, DataLoader] = {}
+    def build_dataloader_valid(self) -> dict[str, DataLoader]:
+        dataloader_test: dict[str, DataLoader] = {}
         for k, v in self.datasets_map.items():
             dataloader_test[k] = create_dataloader(
                 dataset_list=[v],
