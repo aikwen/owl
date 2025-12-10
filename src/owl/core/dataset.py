@@ -5,16 +5,16 @@ from typing import Union, Dict, List, Optional
 import albumentations as albu
 import pathlib
 import torch
-from ..utils import validator
-from ..utils import file_io
-from ..utils import img_op
+from ..utils import validator, file_io, img_op, img_aug, types
+
 
 class ImageDataset(Dataset):
     """
     加载 tp 和 gt 图像
     """
-    def __init__(self, path:Union[str, pathlib.Path],
-                 transform:Optional[albu.Compose]=None):
+
+    def __init__(self, path: Union[str, pathlib.Path],
+                 transform: Optional[albu.Compose] = None):
         """
         Args:
             path (Union[str, pathlib.Path]): 数据集路径
@@ -24,7 +24,7 @@ class ImageDataset(Dataset):
         # 数据集路径
         self.path = validator.data_protocol(path)
         # 数据集列表
-        self.dataset_list:List[Dict] = file_io.load_json(self.path / f"{self.path.name}.json")
+        self.dataset_list: List[Dict] = file_io.load_json(self.path / f"{self.path.name}.json")
         # 数据集要做的变换
         self.transform = transform
 
@@ -48,10 +48,10 @@ class ImageDataset(Dataset):
             gt_img_path = self.path.joinpath("gt", self.dataset_list[idx]["gt"])
 
         # 加载tp 和 gt 图像
-        tp_image:Image.Image = file_io.load_image(tp_img_path)
-        gt_image:Image.Image
+        tp_image: Image.Image = file_io.load_image(tp_img_path)
+        gt_image: Image.Image
 
-        if gt_img_path is  None:
+        if gt_img_path is None:
             gt_image = Image.new("L", tp_image.size, 0)
         else:
             gt_image = file_io.load_image(gt_img_path).convert("L")
@@ -79,14 +79,15 @@ class ImageDataset(Dataset):
                 tp_name,
                 gt_name)
 
-def create_dataloader(dataset_list:List[pathlib.Path],
-                    transform:Optional[albu.Compose],
-                    batchsize:int,
-                    num_workers:int=0,
-                    shuffle:bool=True,
-                    pin_memory: bool=True,
-                    persistent_workers:bool=True,
-                    )-> DataLoader:
+
+def create_dataloader(dataset_list: List[pathlib.Path],
+                      transform: Optional[albu.Compose],
+                      batchsize: int,
+                      num_workers: int = 0,
+                      shuffle: bool = True,
+                      pin_memory: bool = True,
+                      persistent_workers: bool = True,
+                      ) -> DataLoader:
     datasets = []
     for path in dataset_list:
         datasets.append(ImageDataset(path, transform=transform))
@@ -96,4 +97,57 @@ def create_dataloader(dataset_list:List[pathlib.Path],
                       shuffle=shuffle,
                       num_workers=num_workers,
                       persistent_workers=(num_workers > 0) and persistent_workers,
-                      pin_memory=(pin_memory if torch.cuda.is_available() else False),)
+                      pin_memory=(pin_memory if torch.cuda.is_available() else False), )
+
+class OwlDataloader:
+    def __init__(self, datasets_map: Dict[str, pathlib.Path],
+                 transform_pipline: List[types.BaseAugConfig],
+                 batch_size: int,
+                 num_workers: int,
+                 shuffle: bool,
+                 pin_memory: bool,
+                 persistent_workers: bool):
+        """
+        :param datasets_map: 数据集字典，e.g., {"nist16":"path to nist16", "coverage":"path to coverage"}
+        :param transform_pipline:
+        :param batch_size:
+        :param num_workers:
+        :param shuffle:
+        :param pin_memory:
+        :param persistent_workers:
+        """
+        self.datasets_map: Dict[str, pathlib.Path] = datasets_map
+        self.transform_pipline: List[types.BaseAugConfig] = transform_pipline
+        self.batch_size: int = batch_size
+        self.num_worker: int = num_workers
+        self.shuffle: bool = shuffle
+        self.pin_memory: bool = pin_memory
+        self.persistent_workers: bool = persistent_workers
+
+    def build_dataloader_train(self) -> DataLoader:
+        paths = list(self.datasets_map.values())
+        dataloader_train = create_dataloader(
+            dataset_list=paths,
+            transform=img_aug.aug_compose(self.transform_pipline),
+            batchsize=self.batch_size,
+            num_workers=self.num_worker,
+            shuffle=self.shuffle,
+            pin_memory=self.pin_memory,
+            persistent_workers=self.persistent_workers,
+        )
+        return dataloader_train
+
+    def build_dataloader_test(self) -> Dict[str, DataLoader]:
+        dataloader_test: Dict[str, DataLoader] = {}
+        for k, v in self.datasets_map.items():
+            dataloader_test[k] = create_dataloader(
+                dataset_list=[v],
+                transform=img_aug.aug_compose(self.transform_pipline),
+                batchsize=self.batch_size,
+                num_workers=self.num_worker,
+                shuffle=self.shuffle,
+                pin_memory=self.pin_memory,
+                persistent_workers=self.persistent_workers,
+            )
+
+        return dataloader_test
