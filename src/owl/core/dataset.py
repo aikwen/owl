@@ -115,7 +115,7 @@ def create_dataloader(dataset_list: List[pathlib.Path],
 
 class OwlDataloader:
     def __init__(self, datasets_map: dict[str, pathlib.Path],
-                 transform_pipline: List[types.BaseAugConfig],
+                 transform_pipeline: List[types.BaseAugConfig],
                  batch_size: int,
                  num_workers: int,
                  shuffle: bool,
@@ -123,7 +123,7 @@ class OwlDataloader:
                  persistent_workers: bool):
         """
         :param datasets_map: 数据集字典，e.g., {"nist16":"path to nist16", "coverage":"path to coverage"}
-        :param transform_pipline:
+        :param transform_pipeline:
         :param batch_size:
         :param num_workers:
         :param shuffle:
@@ -131,9 +131,9 @@ class OwlDataloader:
         :param persistent_workers:
         """
         self.datasets_map: dict[str, pathlib.Path] = datasets_map
-        self.transform_pipline: List[types.BaseAugConfig] = transform_pipline
+        self.transform_pipeline: List[types.BaseAugConfig] = transform_pipeline
         self.batch_size: int = batch_size
-        self.num_worker: int = num_workers
+        self.num_workers: int = num_workers
         self.shuffle: bool = shuffle
         self.pin_memory: bool = pin_memory
         self.persistent_workers: bool = persistent_workers
@@ -142,9 +142,9 @@ class OwlDataloader:
         paths = list(self.datasets_map.values())
         dataloader_train = create_dataloader(
             dataset_list=paths,
-            transform=img_aug.aug_compose(self.transform_pipline),
+            transform=img_aug.aug_compose(self.transform_pipeline),
             batchsize=self.batch_size,
-            num_workers=self.num_worker,
+            num_workers=self.num_workers,
             shuffle=self.shuffle,
             pin_memory=self.pin_memory,
             persistent_workers=self.persistent_workers,
@@ -156,9 +156,9 @@ class OwlDataloader:
         for k, v in self.datasets_map.items():
             dataloader_test[k] = create_dataloader(
                 dataset_list=[v],
-                transform=img_aug.aug_compose(self.transform_pipline),
+                transform=img_aug.aug_compose(self.transform_pipeline),
                 batchsize=self.batch_size,
-                num_workers=self.num_worker,
+                num_workers=self.num_workers,
                 shuffle=self.shuffle,
                 pin_memory=self.pin_memory,
                 persistent_workers=self.persistent_workers,
