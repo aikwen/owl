@@ -1,165 +1,111 @@
-TRAIN_TEMPLATE = """
-from typing import Any, Dict
-import torch
-from torch import optim, nn
-from torch.utils.data import DataLoader
+TRAIN_TEMPLATE = r"""
 from pathlib import Path
 
-from owl.core import engine, dataset
-from owl.utils import types, img_aug
-from owl.utils.types import OwlMetrics
+from torch.optim.lr_scheduler import LRScheduler
+from torch.utils.data import DataLoader
+from typing_extensions import override
+from owl.core.app import OwlCriterion, OwlApp
+from owl.core.config import TrainBatchConfig, GlobalConfig
+from torch import nn, optim
+import torch
 
-# 模型定义
+from owl.core.dataset import OwlDataloader
+from owl.utils import types
+
+
 class SimpleModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv = nn.Conv2d(3, 1, 3, padding=1)
+
     def forward(self, x):
         return self.conv(x)
 
-# 定义损失函数
-class Criterion(nn.Module):
+
+class Criterion(OwlCriterion):
     def __init__(self):
         super().__init__()
-        self.loss = nn.MSELoss()
-    def forward(self, outputs, target):
-        return self.loss(outputs, target)
+        self.bce = nn.BCEWithLogitsLoss(reduction="mean")
 
-# 定义指标计算
-class Metrics(OwlMetrics):
-    def __init__(self):
-        super().__init__()
+    @override
+    def forward(self, batch: TrainBatchConfig) -> torch.Tensor:
+        pred = batch["model_output"]  # [B, 1, H, W]，来自 model(tp)
+        gt = batch["gt"]  # [B, 1, H, W]，来自 dataloader
+        gt = gt.to(dtype=pred.dtype)
+        loss = self.bce(pred, gt)
+        return loss
 
-    @torch.no_grad()
-    def __call__(self, dataloader: DataLoader, model: nn.Module) -> Dict[str, float]:
-        return {"f1":0.99, "auc":0.99}
 
-class Factory(types.OwlTrainFactory):
-    def __init__(self):
-        super().__init__()
+class App(OwlApp):
+    def __init__(self, global_config: GlobalConfig):
+        super().__init__(global_config=global_config)
 
-    def create_model(self) -> nn.Module:
-        # -------------------------------------------------------------------------
-        # 配置模型
-        # -------------------------------------------------------------------------
+    def model(self) -> nn.Module:
         return SimpleModel()
 
-    def create_criterion(self) -> nn.Module:
-        # -------------------------------------------------------------------------
-        # 配置损失函数
-        # -------------------------------------------------------------------------
+    def criterion(self) -> OwlCriterion:
         return Criterion()
 
-    def create_optimizer(self, model: nn.Module) -> optim.Optimizer:
-        # -------------------------------------------------------------------------
-        # 配置优化器
-        # -------------------------------------------------------------------------
+    def optimizer(self, model: nn.Module) -> optim.Optimizer:
         lr = 0.001
         weight_decay = 0.01
         return optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    def create_scheduler(self, optimizer: optim.Optimizer, epochs: int, batches: int) -> Any | None:
-        # -------------------------------------------------------------------------
-        # 配置学习率优化器
-        # -------------------------------------------------------------------------
+    def scheduler(self, optimizer: optim.Optimizer, epochs: int, batches: int) -> LRScheduler:
         power = 0.9
         total_iters = epochs * batches
-        poly_scheduler = optim \\
-            .lr_scheduler \\
+        poly_scheduler = optim \
+            .lr_scheduler \
             .PolynomialLR(optimizer=optimizer,
                           total_iters=total_iters,
                           power=power)
         return poly_scheduler
 
-
-    def create_train_dataloader(self) -> DataLoader:
-        # -------------------------------------------------------------------------
-        # 配置训练数据集
-        # -------------------------------------------------------------------------
-        # 数据增强 pipeline
-        batch_size = 2
-        num_workers = 1
-        shuffle = True
-        transform_pipeline_train = [
-            types.RotateConfig(p=0.5),
-            types.VFlipConfig(p=0.5),
-            types.HFlipConfig(p=0.5),
-            types.JpegConfig(quality_low=70, quality_high=100, p=0.3),
-            types.GblurConfig(kernel_low=3, kernel_high=15, p=0.3),
-            types.ResizeConfig(width=512, height=512, p=1),
-        ]
-
-        # 数据集列表
-        datasets_train = [
-            Path('example'),
-        ]
-
-        dataloader_train = dataset.create_dataloader(
-            dataset_list=datasets_train,
-            transform=img_aug.aug_compose(transform_pipeline_train),
-            batchsize=batch_size,
-            num_workers=num_workers,
-            shuffle=shuffle,
-        )
-        return dataloader_train
-
-    def create_val_dataloader(self) -> types.ValConfig:
-        # -------------------------------------------------------------------------
-        # 配置验证数据集
-        # -------------------------------------------------------------------------
-        batch_size = 1
-        num_workers = 1
-        shuffle = False
-        transform_pipeline_val = [
-            types.ResizeConfig(width=512, height=512, p=1),
-        ]
-        # 验证数据集有哪些
-        datasets_val = [
-            [Path('example')],
-            [Path('example')],
-            [Path('example')],
-            [Path('example')],
-        ]
-        # 创建验证数据集 dataloader 字典
-        val_dataloaders_dict:Dict[str, DataLoader] = {}
-
-        for i, ds in enumerate(datasets_val):
-            val_dataloaders_dict[f"{i}"] = \\
-                dataset.create_dataloader(
-                        dataset_list=ds,
-                        transform=img_aug.aug_compose(transform_pipeline_val),
-                        batchsize=batch_size,
-                        num_workers=num_workers,
-                        shuffle=shuffle,
-                )
-
-        return types.ValConfig(
-            val_datasets=val_dataloaders_dict,
-            owlMetrics=Metrics()
-        )
+    def validate(self, model: nn.Module, dataloader:DataLoader) -> dict[str, float]:
+        return {"f1":0.99}
 
 
-def main():
-    # -------------------------------------------------------------------------
-    # 运行, 初始化引擎
-    # -------------------------------------------------------------------------
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    epochs = 5
-    e = (engine.OwlEngine(log_name="model_v1")
-        # 配置工厂
-        .config_factory(factory=Factory())
-        # 配置训练 epochs
-        .config_epochs(epochs)
-        # 配置权重保存目录和保存策略
-        .config_checkpoints(checkpoint_dir="checkpoints", autosave=True)
-        # 配置训练模式 TRAIN 从0开始, RESUME 断点续训,
-        .config_train_mode(types.TrainMode.TRAIN)
-        # 配置训练设备
-        .config_device(device)
-        # 构建
-        .build())
-    e.train()
+dataloader_train = OwlDataloader(
+    datasets_map={"example":Path("example")},
+    batch_size=12,
+    shuffle=True,
+    num_workers=4,
+    pin_memory=True,
+    persistent_workers=True,
+    transform_pipeline=[
+        types.RotateConfig(p=0.5),
+        types.VFlipConfig(p=0.5),
+        types.HFlipConfig(p=0.5),
+        types.JpegConfig(quality_low=70, quality_high=100, p=0.3),
+        types.GblurConfig(kernel_low=3, kernel_high=15, p=0.3),
+        types.ResizeConfig(width=512, height=512, p=1),
+    ]
+)
 
-if __name__ == '__main__':
-    main()
+dataloader_valid = OwlDataloader(
+    datasets_map={"example":Path("example")},
+    batch_size=1,
+    shuffle=False,
+    num_workers=1,
+    pin_memory=True,
+    persistent_workers=True,
+    transform_pipeline=[
+        types.ResizeConfig(width=512, height=512, p=1),
+    ]
+)
+
+GLOBAL_CONFIG = GlobalConfig(
+    epochs=30,
+    device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
+    log_name="2025-12-1",
+    checkpoint_dir="checkpoint",
+    checkpoint_autosave=True,
+    dataloader_train=dataloader_train,
+    dataloader_valid=dataloader_valid,
+)
+
+if __name__ == "__main__":
+    app = App(global_config=GLOBAL_CONFIG)
+    app.run_train(cudnn_benchmark=True)
+
 """
