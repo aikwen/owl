@@ -8,17 +8,45 @@ import torch
 from typing_extensions import TypedDict
 from ..utils import validator, file_io, img_op, img_aug, types
 
+
 class DataSetItem(TypedDict):
+    """定义单条数据样本的字典结构。
+
+    通常作为 Dataset.__getitem__ 的返回值。
+
+    Attributes:
+        tp_tensor (torch.Tensor): 篡改图像（Tampered Image）张量。
+            Shape: [3, H, W] (RGB格式)
+        gt_tensor (torch.Tensor): 真实标签（Ground Truth）张量。
+            Shape: [1, H, W] (Mask格式)
+        tp_name (str): 篡改图像的文件名（例如 "001_t.png"）。
+        gt_name (str): 对应标签的文件名（例如 "001_mask.png"）。
+    """
     tp_tensor: torch.Tensor
     gt_tensor: torch.Tensor
     tp_name: str
     gt_name: str
 
+
 class DataSetBatch(TypedDict):
+    """定义一个 Batch 的数据字典结构。
+
+    通常作为 DataLoader 迭代出的对象，由 collate_fn 堆叠 DataSetItem 而成。
+
+    Attributes:
+        tp_tensor (torch.Tensor): 批次级篡改图像张量。
+            Shape: [B, 3, H, W]，其中 B 为 Batch Size。
+        gt_tensor (torch.Tensor): 批次级真实标签张量。
+            Shape: [B, 1, H, W]。
+        tp_name (list[str]): 当前 Batch 中所有样本的图像文件名列表。
+            列表长度等于 Batch Size。
+        gt_name (list[str]): 当前 Batch 中所有样本的标签文件名列表。
+    """
     tp_tensor: torch.Tensor  # [B, 3, H, W]
     gt_tensor: torch.Tensor  # [B, 1, H, W]
     tp_name: list[str]
     gt_name: list[str]
+
 
 class ImageDataset(Dataset):
     """
@@ -27,10 +55,11 @@ class ImageDataset(Dataset):
 
     def __init__(self, path: Union[str, pathlib.Path],
                  transform: Optional[albu.Compose] = None):
-        """
+        """ImageDataset
+
         Args:
             path (Union[str, pathlib.Path]): 数据集路径
-            postprocess (Optional[Callable[[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray]]]):
+            transform (Optional[Callable[[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray]]]):
                 A function to post-process the images and masks after loading.
         """
         # 数据集路径
@@ -47,11 +76,10 @@ class ImageDataset(Dataset):
         """
         Args:
             idx (int): 对应的下标
+
         Returns:
-            tp (tensor) shape [channel, height, width], channel = 3
-            gt (tensor) shape [channel, height, width], channel = 1
-            tp_name (str) 图像名, 比如 tp.png
-            gt_name (str)图像名， 比如 gt.png
+            DataSetItem: 包含图像张量和文件名的样本字典。
+                具体字段定义请参考 `types.DataSetItem`。
         """
         # 加载对应 idx 的 tp 图像路径
         tp_img_path = self.path.joinpath("tp", self.dataset_list[idx]["tp"])
@@ -102,6 +130,27 @@ def create_dataloader(dataset_list: List[pathlib.Path],
                       pin_memory: bool = True,
                       persistent_workers: bool = True,
                       ) -> DataLoader:
+    """创建包含多个数据集的 DataLoader。
+
+    该函数会自动遍历 `dataset_list` 中的所有路径，为每个路径创建一个 ImageDataset，
+    然后使用 ConcatDataset 将它们合并为一个大的数据集。
+
+    Args:
+        dataset_list: 包含数据集根目录路径的列表。
+        transform: Albumentations 数据增强流水线对象（可选）。
+        batchsize: 批次大小。
+        num_workers: 数据加载子进程数量。默认为 0（主进程加载）。
+        shuffle: 是否在每个 Epoch 开始时打乱数据。默认为 True。
+        pin_memory: 是否使用 CUDA 锁页内存。
+            注意：代码会自动检测 `torch.cuda.is_available()`，如果无 GPU，
+            即使设为 True 也会强制使用 False。
+        persistent_workers: 是否保持子进程存活。
+            注意：仅当 `num_workers > 0` 时生效。如果 `num_workers=0`，
+            即使设为 True 也会强制使用 False。
+
+    Returns:
+        DataLoader: 包装了所有合并数据集的 PyTorch DataLoader 实例。
+    """
     datasets = []
     for path in dataset_list:
         datasets.append(ImageDataset(path, transform=transform))
@@ -113,6 +162,7 @@ def create_dataloader(dataset_list: List[pathlib.Path],
                       persistent_workers=(num_workers > 0) and persistent_workers,
                       pin_memory=(pin_memory if torch.cuda.is_available() else False), )
 
+
 class OwlDataloader:
     def __init__(self, datasets_map: dict[str, pathlib.Path],
                  transform_pipeline: List[types.BaseAugConfig],
@@ -121,14 +171,33 @@ class OwlDataloader:
                  shuffle: bool,
                  pin_memory: bool,
                  persistent_workers: bool):
-        """
-        :param datasets_map: 数据集字典，e.g., {"nist16":"path to nist16", "coverage":"path to coverage"}
-        :param transform_pipeline:
-        :param batch_size:
-        :param num_workers:
-        :param shuffle:
-        :param pin_memory:
-        :param persistent_workers:
+        """初始化 OwlDataloader 配置封装。
+
+        Args:
+            datasets_map: 数据集名称到路径的映射字典。
+                例如: {"nist16": Path("data/nist16"), "coverage": Path("data/coverage")}。
+            transform_pipeline: 数据增强配置列表，定义了图像预处理和增强的流水线。
+            batch_size: 每个批次的样本数量。
+            num_workers: 用于数据加载的子进程数量。
+                0 表示在主进程中加载数据；大于 0 表示使用多进程加载。
+            shuffle: 是否打乱数据顺序。
+                通常训练集设为 True，验证/测试集设为 False。
+            pin_memory: 是否将 Tensor 放入 CUDA 锁页内存 (Pinned Memory)。
+                如果你使用 GPU 训练，设为 True 可以加速 CPU 到 GPU 的数据传输。
+            persistent_workers: 是否在一个 epoch 结束后保持 worker 进程存活。
+                如果设为 True，可以减少每个 epoch 重新创建子进程的开销，但会占用更多内存。
+
+        Examples:
+            transform_pipeline 的配置示例::
+
+                [
+                    types.RotateConfig(p=0.5),
+                    types.VFlipConfig(p=0.5),
+                    types.HFlipConfig(p=0.5),
+                    types.JpegConfig(quality_low=70, quality_high=100, p=0.3),
+                    types.GblurConfig(kernel_low=3, kernel_high=15, p=0.3),
+                    types.ResizeConfig(width=512, height=512, p=1),
+                ]
         """
         self.datasets_map: dict[str, pathlib.Path] = datasets_map
         self.transform_pipeline: List[types.BaseAugConfig] = transform_pipeline
@@ -139,6 +208,14 @@ class OwlDataloader:
         self.persistent_workers: bool = persistent_workers
 
     def build_dataloader_train(self) -> DataLoader:
+        """构建训练用的 DataLoader。
+
+        将 `datasets_map` 中的所有数据集路径合并为一个大的 ConcatDataset，
+        并应用统一的增强流水线。
+
+        Returns:
+            配置好的 PyTorch DataLoader 对象，包含合并后的所有训练数据。
+        """
         paths = list(self.datasets_map.values())
         dataloader_train = create_dataloader(
             dataset_list=paths,
@@ -152,6 +229,15 @@ class OwlDataloader:
         return dataloader_train
 
     def build_dataloader_valid(self) -> dict[str, DataLoader]:
+        """构建验证用的 DataLoader 字典。
+
+        为 `datasets_map` 中的每一个数据集单独创建一个 DataLoader，
+        以便能够独立评估模型在不同数据集上的性能指标。
+
+        Returns:
+            一个字典，Key 为数据集名称 (与 datasets_map 的 Key 一致)，
+            Value 为对应的 PyTorch DataLoader 对象。
+        """
         dataloader_test: dict[str, DataLoader] = {}
         for k, v in self.datasets_map.items():
             dataloader_test[k] = create_dataloader(

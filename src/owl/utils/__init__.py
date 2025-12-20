@@ -28,10 +28,13 @@ def __getattr__(name:str):
         return module
     raise AttributeError(f"module 'utils' has no attribute '{name}'")
 
-__all__ = ["file_io",
-           "img_aug",
-           "img_op",
-           "types",
-           "validator",
-           "p.py",
-           "metrics"]
+__all__ = [
+            "file_io",
+            "img_aug",
+            "img_op",
+            "types",
+            "validator",
+            "metrics",
+            "validator",
+            "console",
+        ]

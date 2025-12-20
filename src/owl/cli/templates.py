@@ -60,12 +60,13 @@ class App(OwlApp):
                           total_iters=total_iters,
                           power=power)
         return poly_scheduler
-
+    
+    @override
     def validate(self, model: nn.Module, dataloader:DataLoader) -> dict[str, float]:
         return {"f1":0.99}
 
 
-dataloader_train = OwlDataloader(
+dataloader_train:OwlDataloader = OwlDataloader(
     datasets_map={"example":Path("example")},
     batch_size=12,
     shuffle=True,
@@ -82,7 +83,7 @@ dataloader_train = OwlDataloader(
     ]
 )
 
-dataloader_valid = OwlDataloader(
+dataloader_valid:OwlDataloader = OwlDataloader(
     datasets_map={"example":Path("example")},
     batch_size=1,
     shuffle=False,
@@ -94,7 +95,7 @@ dataloader_valid = OwlDataloader(
     ]
 )
 
-GLOBAL_CONFIG = GlobalConfig(
+GLOBAL_CONFIG:GlobalConfig = GlobalConfig(
     epochs=30,
     device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
     log_name="2025-12-1",
@@ -106,6 +107,16 @@ GLOBAL_CONFIG = GlobalConfig(
 
 if __name__ == "__main__":
     app = App(global_config=GLOBAL_CONFIG)
+    # 预训练
     app.run_train(cudnn_benchmark=True)
-
+    
+    # 断点续训
+    # checkpoint_path = ""
+    # checkpoint_state = torch.load(checkpoint_path, map_location= GLOBAL_CONFIG["device"])
+    # app.run_resume(checkpoint_state = checkpoint_state, cudnn_benchmark=True)
+    
+    # 微调
+    # checkpoint_path = ""
+    # checkpoint_state = torch.load(checkpoint_path, map_location= GLOBAL_CONFIG["device"])
+    # app.run_finetune(checkpoint_state = checkpoint_state, cudnn_benchmark=True)
 """

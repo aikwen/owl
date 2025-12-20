@@ -45,12 +45,38 @@ class _AppBase(ABC):
         ...
 
     def run_train(self, cudnn_benchmark:bool=False):
+        """开始一个新的训练任务（从头训练）。
+
+        Args:
+            cudnn_benchmark: 是否开启 cuDNN 的 benchmark 模式。
+                如果输入图像尺寸固定，开启它可以加速训练（会自动寻找最优卷积算法）。
+        """
         self._run(checkpoint_state=None, cudnn_benchmark=cudnn_benchmark)
 
     def run_resume(self, checkpoint_state: CheckpointState, cudnn_benchmark:bool=False):
+        """从检查点恢复训练（断点续训）。
+
+        不仅加载模型权重，还会恢复优化器状态、学习率调度器状态和 Epoch 进度，
+        确保训练状态与保存时完全一致。
+
+        Args:
+            checkpoint_state: 加载的权重字典 (Checkpoint)。
+            cudnn_benchmark: 是否开启 cuDNN 的 benchmark 模式。
+                如果输入图像尺寸固定，开启它可以加速训练（会自动寻找最优卷积算法）。
+        """
         self._run(checkpoint_state, checkpoint_only=False, cudnn_benchmark=cudnn_benchmark)
 
     def run_finetune(self, checkpoint_state: CheckpointState, cudnn_benchmark:bool=False):
+        """基于检查点进行微调（Finetune）。
+
+        仅加载模型的权重参数。优化器、学习率调度器和 Epoch 计数器将重新初始化，
+        适用于迁移学习或在预训练模型基础上调整。
+
+        Args:
+            checkpoint_state: 加载的权重字典 (Checkpoint)。
+            cudnn_benchmark: 是否开启 cuDNN 的 benchmark 模式。
+                如果输入图像尺寸固定，开启它可以加速训练（会自动寻找最优卷积算法）。
+        """
         self._run(checkpoint_state, checkpoint_only=True, cudnn_benchmark=cudnn_benchmark)
 
 
@@ -126,7 +152,8 @@ class OwlApp(_AppBuild, ABC):
             torch.backends.cudnn.benchmark = True
 
         for epoch in range(self._config["current_epoch"], self._config["epochs"]):
-            # 开始训练
+            # ==========开始训练=============
+
             self._config["model"].train()
             self._config["current_epoch"] = epoch
             # 记录一些损失

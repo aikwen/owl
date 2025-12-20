@@ -3,13 +3,13 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from . import dataset
-    from . import engine
-    from . import status
+    from . import app
+    from . import config
 
 _delayed_imports = {
     "dataset": ".dataset",
-    "engine": ".engine",
-    "status": ".status",
+    "app": ".app",
+    "config": ".config",
 }
 
 def __getattr__(name:str):
@@ -23,5 +23,5 @@ def __getattr__(name:str):
 
 
 __all__ = ["dataset",
-           "engine",
-           "status"]
+           "app",
+           "config"]

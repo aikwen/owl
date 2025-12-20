@@ -4,13 +4,31 @@ from typing import Union, Any, List
 
 
 def data_protocol(path: Union[str, Path]) -> Path:
-    """
-    data_protocol 验证是否符合数据集格式
-    1. 检查文件结构: gt/tp 文件夹和 json 文件
-    2. 检查 json 是否被成功解析
+    """验证数据集是否严格符合规定的文件结构协议。
 
-    :param path: 数据集根路径
-    :return:  pathlib.Path 对象
+    **校验规则列表**::
+
+        1. 根目录必须存在。
+        2. 必须包含 'gt' 和 'tp' 两个子文件夹。
+        3. 必须包含与目录同名的 .json 描述文件。
+
+    期望的文件结构示例::
+
+        dataset_root_name/
+        ├── gt/                 # 掩码图文件夹
+        ├── tp/                 # 篡改图文件夹
+        └── dataset_root_name.json  # 必须与根目录同名的元数据文件
+
+    Args:
+        path: 数据集根目录路径。可以是字符串路径或 pathlib.Path 对象。
+
+    Returns:
+        Path: 校验通过后的绝对路径对象 (Resolved Path)。
+
+    Raises:
+        TypeError: 当传入的 path 类型不是 str 或 Path 时抛出。
+        FileNotFoundError:
+        ValueError: 当 JSON 文件存在但无法被解析（格式错误）时抛出。
     """
     # 1. 基础类型与路径检查
     if not isinstance(path, (str, Path)):
@@ -43,7 +61,3 @@ def data_protocol(path: Union[str, Path]) -> Path:
         raise ValueError(f"读取 JSON 文件失败: {json_file.name} -> {e}")
 
     return p
-
-def check(ok: bool, error_msg:str):
-    if not ok:
-        raise RuntimeError(error_msg)
