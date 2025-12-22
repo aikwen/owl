@@ -5,7 +5,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader
 from typing_extensions import override
 from owl.core.app import OwlCriterion, OwlApp
-from owl.core.config import TrainBatchConfig, GlobalConfig
+from owl.core.config import TrainBatchConfig, GlobalConfig, CheckpointState
 from torch import nn, optim
 import torch
 
@@ -112,11 +112,11 @@ if __name__ == "__main__":
     
     # 断点续训
     # checkpoint_path = ""
-    # checkpoint_state = torch.load(checkpoint_path, map_location= GLOBAL_CONFIG["device"])
+    # checkpoint_state:CheckpointState = torch.load(checkpoint_path, map_location= GLOBAL_CONFIG["device"])
     # app.run_resume(checkpoint_state = checkpoint_state, cudnn_benchmark=True)
     
     # 微调
     # checkpoint_path = ""
-    # checkpoint_state = torch.load(checkpoint_path, map_location= GLOBAL_CONFIG["device"])
+    # checkpoint_state:CheckpointState = torch.load(checkpoint_path, map_location= GLOBAL_CONFIG["device"])
     # app.run_finetune(checkpoint_state = checkpoint_state, cudnn_benchmark=True)
 """
