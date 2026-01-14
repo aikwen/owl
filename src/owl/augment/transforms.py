@@ -10,6 +10,30 @@ from .types import (BaseAugConfig,
                     GNoiseConfig,
                     ScaleConfig)
 
+def dict2config(t: dict) -> BaseAugConfig:
+    config_type = t['type']
+    param = t['param']
+
+    if config_type == "rotate":
+        return RotateConfig(**param)
+    elif config_type == "vflip":
+        return VFlipConfig(**param)
+    elif config_type == "hflip":
+        return HFlipConfig(**param)
+    elif config_type == "jpeg":
+        return JpegConfig(**param)
+    elif config_type == "gblur":
+        return GblurConfig(**param)
+    elif config_type == "gnoise":
+        return GNoiseConfig(**param)
+    elif config_type == "scale":
+        return ScaleConfig(**param)
+    elif config_type == "resize":
+        param.pop('p', None)
+        return ResizeConfig(p=1.0, **param)
+    else:
+        raise ValueError(f"Unknown config type: {config_type}")
+
 def config2transform(cfg: BaseAugConfig) -> albu.BasicTransform:
     """
     将 config 转化成对于的具体转换

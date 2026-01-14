@@ -97,7 +97,7 @@ class GNoiseConfig(BaseAugConfig):
 @dataclass
 class ScaleConfig(BaseAugConfig):
     """
-    随机在 (1-scale1, 1+scale2) 之间旋转一个值进行缩放
+    随机在 (1+scale1, 1+scale2) 之间旋转一个值进行缩放
     """
     scale1: float
     scale2: float
