@@ -1,0 +1,26 @@
+# 模型
+model: "model.model.SimpleModel"
+
+# 验证数据集
+datasets_validate:
+  path:
+    - "example"
+  batchsize: 1
+  transform_pipeline:
+    - {type: resize, param: {width: 512, height: 512}}
+  custom_validate_func: "model.model.validate"
+  other:
+    num_workers: 1
+    shuffle: false
+    pin_memory: true
+    persistent_workers: true
+
+main:
+  log_name: "2026-1-1"
+  # "cpu", "cuda:0" or "auto"
+  # "auto"  is equivalent to "cuda:0" if torch.cuda.is_available() else "cpu"
+  device: "auto"
+  run:
+    mode: "validate"
+    checkpoint_path: ""
+    cudnn_benchmark: true

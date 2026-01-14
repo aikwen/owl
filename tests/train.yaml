@@ -1,0 +1,65 @@
+# 模型
+model: "model.model.SimpleModel"
+
+# 损失函数
+criterion: "model.model.Criterion"
+
+# 优化器
+optimizer:
+  type: "adamw"
+  param:
+    lr: 0.001
+    weight_decay: 0.01
+
+# 学习率调度器
+schedule:
+  type: "poly"
+  param:
+    power: 0.9
+
+# 训练数据集
+datasets_train:
+  path:
+    - "example"
+  batchsize: 12
+  epochs: 30
+  transform_pipeline:
+    - {type: rotate, param: {p: 0.5}}
+    - {type: vflip,  param: {p: 0.5}}
+    - {type: hflip,  param: {p: 0.5}}
+    - {type: jpeg,   param: {p: 0.3, quality_low: 70, quality_high: 100}}
+    - {type: gblur,  param: {p: 0.3, kernel_low: 3, kernel_high: 15}}
+    - {type: resize, param: {width: 512, height: 512}}
+  other:
+    num_workers: 4
+    shuffle: true
+    pin_memory: true
+    persistent_workers: true
+
+# 验证数据集
+datasets_validate:
+  path:
+    - "example"
+  batchsize: 1
+  transform_pipeline:
+    - {type: resize, param: {p: 1, width: 512, height: 512}}
+  custom_validate_func: "model.model.validate"
+  other:
+    num_workers: 1
+    shuffle: false
+    pin_memory: true
+    persistent_workers: true
+
+checkpoints:
+  auto_save: true
+  save_dir: "checkpoints"
+
+main:
+  log_name: "2026-1-1"
+  # "cpu", "cuda:0" or "auto"
+  # "auto"  is equivalent to "cuda:0" if torch.cuda.is_available() else "cpu"
+  device: "auto"
+  # "train", "resume", "finetune"
+  run:
+    mode: "train"
+    checkpoint_path: ""
