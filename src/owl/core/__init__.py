@@ -5,11 +5,22 @@ if TYPE_CHECKING:
     from . import dataset
     from . import app
     from . import config
+    from . import schemas
+    from . import scheduler
+    from . import optimizer
+    from . import model
+    from . import engine
 
 _delayed_imports = {
     "dataset": ".dataset",
     "app": ".app",
     "config": ".config",
+    "schemas": ".schemas",
+    "optimizer": ".optimizer",
+    "model": ".model",
+    "engine": ".engine",
+    "scheduler": ".scheduler",
+
 }
 
 def __getattr__(name:str):
@@ -24,4 +35,11 @@ def __getattr__(name:str):
 
 __all__ = ["dataset",
            "app",
-           "config"]
+           "config",
+           "schemas",
+           "optimizer",
+           "model",
+           "engine",
+           "scheduler",
+
+           ]
