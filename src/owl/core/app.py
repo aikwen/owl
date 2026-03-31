@@ -1,6 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Dict
+
 from prettytable import PrettyTable
 from torch.optim.lr_scheduler import LRScheduler
 from typing_extensions import override, final, List, Any
@@ -8,22 +10,25 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from .config import GlobalConfig, _Config, CheckpointState, TrainBatchConfig
-from .dataset import DataSetBatch
-from ..utils import file_io, console
+from .criterion import OwlCriterion
+from .dataset import OwlDataloader
+from .schemas import DataSetBatch
+from ..utils import io, console
 
-_welcome_is_print:bool = False
-
-class OwlCriterion(nn.Module, ABC):
-    @abstractmethod
-    def forward(self, batch:TrainBatchConfig) -> torch.Tensor:
-        ...
+_welcome_is_print: bool = False
 
 
-class _AppBase(ABC):
+class _ModelBase(ABC):
+    """所有 App 的基类。
+    无论是训练还是测试，都需要定义模型。
+    """
+
     @abstractmethod
     def model(self) -> nn.Module:
         ...
 
+
+class _AppBase(_ModelBase, ABC):
     @abstractmethod
     def criterion(self) -> OwlCriterion:
         ...
@@ -33,18 +38,19 @@ class _AppBase(ABC):
         ...
 
     @abstractmethod
-    def scheduler(self, optimizer: optim.Optimizer, epochs: int, batches: int)-> LRScheduler:
+    def scheduler(self, optimizer: optim.Optimizer, epochs: int, batches: int) -> LRScheduler:
         ...
 
     @abstractmethod
-    def _run(self, checkpoint_state: CheckpointState | None, checkpoint_only:bool=False, cudnn_benchmark:bool=False):
+    def _run(self, checkpoint_state: CheckpointState | None, checkpoint_only: bool = False,
+             cudnn_benchmark: bool = False):
         ...
 
     @abstractmethod
-    def validate(self, model: nn.Module, dataloader:DataLoader) -> dict[str, float]:
+    def validate(self, model: nn.Module, dataloader: DataLoader) -> dict[str, float]:
         ...
 
-    def run_train(self, cudnn_benchmark:bool=False):
+    def run_train(self, cudnn_benchmark: bool = False):
         """开始一个新的训练任务（从头训练）。
 
         Args:
@@ -53,7 +59,7 @@ class _AppBase(ABC):
         """
         self._run(checkpoint_state=None, cudnn_benchmark=cudnn_benchmark)
 
-    def run_resume(self, checkpoint_state: CheckpointState, cudnn_benchmark:bool=False):
+    def run_resume(self, checkpoint_state: CheckpointState, cudnn_benchmark: bool = False):
         """从检查点恢复训练（断点续训）。
 
         不仅加载模型权重，还会恢复优化器状态、学习率调度器状态和 Epoch 进度，
@@ -66,7 +72,7 @@ class _AppBase(ABC):
         """
         self._run(checkpoint_state, checkpoint_only=False, cudnn_benchmark=cudnn_benchmark)
 
-    def run_finetune(self, checkpoint_state: CheckpointState, cudnn_benchmark:bool=False):
+    def run_finetune(self, checkpoint_state: CheckpointState, cudnn_benchmark: bool = False):
         """基于检查点进行微调（Finetune）。
 
         仅加载模型的权重参数。优化器、学习率调度器和 Epoch 计数器将重新初始化，
@@ -86,11 +92,11 @@ class _AppBuild(_AppBase, ABC):
         self._build_log: PrettyTable = PrettyTable(["global config", "value"])
         self._config: _Config = self._build_config(global_config)
 
-    def _build_config(self, global_config:GlobalConfig)-> _Config:
-        logger_train: logging.Logger = file_io.get_logger(log_file=global_config["log_name"],
+    def _build_config(self, global_config: GlobalConfig) -> _Config:
+        logger_train: logging.Logger = io.get_logger(log_file=global_config["log_name"],
                                                           mode="train",
                                                           is_format=True)
-        logger_valid: logging.Logger = file_io.get_logger(log_file=global_config["log_name"],
+        logger_valid: logging.Logger = io.get_logger(log_file=global_config["log_name"],
                                                           mode="valid",
                                                           is_format=False)
         dataloader_train: DataLoader = global_config["dataloader_train"].build_dataloader_train()
@@ -114,19 +120,20 @@ class _AppBuild(_AppBase, ABC):
 
         return _Config(
             current_epoch=current_epoch,
-            epochs = epochs,
-            device = device,
-            logger_train = logger_train,
-            logger_valid = logger_valid,
-            dataloader_train = dataloader_train,
-            dataloader_valid = dataloader_valid,
-            checkpoint_dir = global_config["checkpoint_dir"],
-            checkpoint_autosave = global_config["checkpoint_autosave"],
-            model= model,
-            criterion = criterion,
-            optimizer = optimizer,
-            scheduler = scheduler,
+            epochs=epochs,
+            device=device,
+            logger_train=logger_train,
+            logger_valid=logger_valid,
+            dataloader_train=dataloader_train,
+            dataloader_valid=dataloader_valid,
+            checkpoint_dir=global_config["checkpoint_dir"],
+            checkpoint_autosave=global_config["checkpoint_autosave"],
+            model=model,
+            criterion=criterion,
+            optimizer=optimizer,
+            scheduler=scheduler,
         )
+
 
 class OwlApp(_AppBuild, ABC):
     def __init__(self, global_config: GlobalConfig):
@@ -134,7 +141,8 @@ class OwlApp(_AppBuild, ABC):
 
     @final
     @override
-    def _run(self, checkpoint_state: CheckpointState | None, checkpoint_only:bool=False, cudnn_benchmark:bool=False):
+    def _run(self, checkpoint_state: CheckpointState | None, checkpoint_only: bool = False,
+             cudnn_benchmark: bool = False):
         # 打印欢迎词
         global _welcome_is_print
         if not _welcome_is_print:
@@ -146,7 +154,7 @@ class OwlApp(_AppBuild, ABC):
             self._load_checkpoint(checkpoint_state, checkpoint_only)
 
         self._build_log.add_row(["start lr", self._config["optimizer"].param_groups[0]["lr"]])
-        self._build_log.add_row(["start epoch", self._config["current_epoch"]+1])
+        self._build_log.add_row(["start epoch", self._config["current_epoch"] + 1])
         self._config["logger_train"].info(f"\n{self._build_log}")
         if torch.cuda.is_available() and cudnn_benchmark:
             torch.backends.cudnn.benchmark = True
@@ -172,11 +180,11 @@ class OwlApp(_AppBuild, ABC):
                 # 获取输出
                 outputs = self._config["model"](tp)
                 # 构造损失函数输入
-                train_batch:TrainBatchConfig = {
+                train_batch: TrainBatchConfig = {
                     "current_epoch": epoch,
-                    "current_batch": batch-1,
-                    "gt":gt,
-                    "model_output":outputs,
+                    "current_batch": batch - 1,
+                    "gt": gt,
+                    "model_output": outputs,
                 }
                 loss = self._config["criterion"](train_batch)
                 loss.backward()
@@ -191,8 +199,8 @@ class OwlApp(_AppBuild, ABC):
                     avg_loss = interval_loss / cnt
                     cur_lr = f"{self._config['optimizer'].param_groups[0]['lr']:.8f}"
                     self._config['logger_train'].info(f"Epoch [{epoch + 1:>{epoch_width}}/{self._config['epochs']}] | "
-                                f"Batch [{batch:>{batches_width}}/{total_batches}] | "
-                                f"Loss {avg_loss:.6f} | LR {cur_lr}")
+                                                      f"Batch [{batch:>{batches_width}}/{total_batches}] | "
+                                                      f"Loss {avg_loss:.6f} | LR {cur_lr}")
 
                     # 清空这10轮的损失
                     interval_loss = 0.0
@@ -206,9 +214,9 @@ class OwlApp(_AppBuild, ABC):
             self._config["model"].eval()
             with torch.no_grad():
                 metrics_types = set()
-                row_data:List[dict[str, Any]] = []
+                row_data: List[dict[str, Any]] = []
                 for name, dataloader in self._config["dataloader_valid"].items():
-                    name:str
+                    name: str
                     dataloader: DataLoader
                     metric = self.validate(self._config["model"], dataloader)
                     metrics_types.update(metric.keys())
@@ -216,16 +224,16 @@ class OwlApp(_AppBuild, ABC):
                 self._logger_validate(metrics_types, row_data, epoch)
 
     @override
-    def validate(self, model: nn.Module, dataloader:DataLoader) -> dict[str, float]:
+    def validate(self, model: nn.Module, dataloader: DataLoader) -> dict[str, float]:
         return {}
 
-    def _load_checkpoint(self, checkpoint_state:CheckpointState, checkpoint_only:bool):
+    def _load_checkpoint(self, checkpoint_state: CheckpointState, checkpoint_only: bool):
         self._config["model"].load_state_dict(checkpoint_state["model_state"])
 
         if not checkpoint_only:
             self._config["optimizer"].load_state_dict(checkpoint_state["optimizer_state"])
             self._config["scheduler"].load_state_dict(checkpoint_state["scheduler_state"])
-            self._config["current_epoch"] = checkpoint_state["epoch"]+1
+            self._config["current_epoch"] = checkpoint_state["epoch"] + 1
 
     def _save_checkpoint(self):
         current_epoch = self._config["current_epoch"]
@@ -233,14 +241,14 @@ class OwlApp(_AppBuild, ABC):
         Path(self._config["checkpoint_dir"]).mkdir(parents=True, exist_ok=True)
         save_path = Path(self._config["checkpoint_dir"]) / filename
         checkpoint_state: CheckpointState = CheckpointState(
-            epoch = current_epoch,
+            epoch=current_epoch,
             model_state=self._config["model"].state_dict(),
             optimizer_state=self._config["optimizer"].state_dict(),
             scheduler_state=self._config["scheduler"].state_dict(),
         )
         torch.save(checkpoint_state, save_path)
 
-    def _logger_validate(self, metrics_types:set, row_data:List[dict[str, Any]], e:int):
+    def _logger_validate(self, metrics_types: set, row_data: List[dict[str, Any]], e: int):
         headers = ["dataset"]
         # 获取所有的指标类型
         metrics_types_list = sorted(metrics_types)
@@ -258,3 +266,82 @@ class OwlApp(_AppBuild, ABC):
         # 打印到日志
         self._config["logger_valid"].info(f"Epoch: {e + 1}")
         self._config["logger_valid"].info(tb)
+
+class OwlTestApp(ABC, _ModelBase):
+    """
+
+    """
+    def __init__(self, dataloader: OwlDataloader, device: torch.device=torch.device("cpu")):
+        super().__init__()
+        self._dataloader: dict[str, DataLoader] = dataloader.build_dataloader_valid()
+        self._device: torch.device = device
+        self._model_instance: nn.Module = self.model().to(self._device)
+        self._dataloader_map: dict[str, Path] = dataloader.datasets_map
+
+    def inference_pred(self, batch: DataSetBatch):
+        return self._model_instance(batch["tp_tensor"].to(self._device))
+
+    def run_pred(self, checkpoint:CheckpointState, output_dir:str, threshold:float=0.5):
+        from torchvision.utils import save_image
+        from PIL import Image
+        import torch.nn.functional as F
+        import json
+        # 加载权重
+        self._model_instance.load_state_dict(checkpoint["model_state"])
+        self._model_instance.eval()
+        # 输出目录
+        out_path = Path(output_dir)
+        out_path.mkdir(parents=True, exist_ok=True)
+        with torch.no_grad():
+            for name, dataloader in self._dataloader.items():
+                # 创建该数据集的文件夹和 result_list
+                output_pred = out_path / name
+                output_pred.mkdir(parents=True, exist_ok=True)
+                results_list = []
+                # 该数据集的真实路径
+                root_path = self._dataloader_map[name]
+                for batch in dataloader:
+                    batch: DataSetBatch
+                    outs = self.inference_pred(batch)
+                    # 保存每张图片
+                    for idx in range(outs.shape[0]):
+                        tp_name = batch["tp_name"][idx]
+                        gt_name = batch["gt_name"][idx]
+                        tp_name_without_ext = Path(tp_name).stem
+                        # 保存之前还原尺寸
+                        with Image.open(root_path / "tp" / tp_name) as img:
+                            orig_w, orig_h = img.size
+                            single_tensor = outs[idx].unsqueeze(0)
+                            resized_tensor = F.interpolate(
+                                single_tensor,
+                                size=(orig_h, orig_w),
+                                mode='bilinear',
+                                align_corners=False
+                            )
+                            # 二值化
+                            pred_binary = (resized_tensor > threshold).float()
+                            # 保存
+                            save_name = f"{tp_name_without_ext}_pred.png"
+                            save_image(pred_binary[0], output_pred / save_name)
+                            # 保存到 json
+                            results_list.append({
+                                "tp": f"{tp_name}",
+                                "gt": f"{gt_name}",
+                                "pred": f"{save_name}",
+                                "aspect_ratio": round(orig_w / orig_h, 3)
+                            })
+                # index.json 内容
+                final_json = {
+                    "dataset_path": str(root_path.absolute()) if root_path else "",  # 转绝对路径字符串
+                    "pred": results_list
+                }
+                # 保存index.json
+                with open(output_pred / "index.json", "w", encoding="utf-8") as f:
+                    json.dump(final_json, f, indent=4, ensure_ascii=False)
+
+
+    def inference_metric(self)-> Dict[str, float]:
+        raise NotImplementedError("For 'owl test metric', you must override inference_metric().")
+
+    def run_metric(self, output_file:str, checkpoints: List[CheckpointState]):
+        ...

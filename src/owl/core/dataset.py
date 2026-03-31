@@ -1,51 +1,14 @@
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataset import ConcatDataset
-from typing import Union, List, Optional
-import albumentations as albu
+from typing import Union, List, Optional, Any
+import albumentations as A
 import pathlib
 import torch
-from typing_extensions import TypedDict
-from ..utils import validator, file_io, img_op, img_aug, types
 
-
-class DataSetItem(TypedDict):
-    """定义单条数据样本的字典结构。
-
-    通常作为 Dataset.__getitem__ 的返回值。
-
-    Attributes:
-        tp_tensor (torch.Tensor): 篡改图像（Tampered Image）张量。
-            Shape: [3, H, W] (RGB格式)
-        gt_tensor (torch.Tensor): 真实标签（Ground Truth）张量。
-            Shape: [1, H, W] (Mask格式)
-        tp_name (str): 篡改图像的文件名（例如 "001_t.png"）。
-        gt_name (str): 对应标签的文件名（例如 "001_mask.png"）。
-    """
-    tp_tensor: torch.Tensor
-    gt_tensor: torch.Tensor
-    tp_name: str
-    gt_name: str
-
-
-class DataSetBatch(TypedDict):
-    """定义一个 Batch 的数据字典结构。
-
-    通常作为 DataLoader 迭代出的对象，由 collate_fn 堆叠 DataSetItem 而成。
-
-    Attributes:
-        tp_tensor (torch.Tensor): 批次级篡改图像张量。
-            Shape: [B, 3, H, W]，其中 B 为 Batch Size。
-        gt_tensor (torch.Tensor): 批次级真实标签张量。
-            Shape: [B, 1, H, W]。
-        tp_name (list[str]): 当前 Batch 中所有样本的图像文件名列表。
-            列表长度等于 Batch Size。
-        gt_name (list[str]): 当前 Batch 中所有样本的标签文件名列表。
-    """
-    tp_tensor: torch.Tensor  # [B, 3, H, W]
-    gt_tensor: torch.Tensor  # [B, 1, H, W]
-    tp_name: list[str]
-    gt_name: list[str]
+from .schemas import DataSetItem
+from ..utils import validator, io, img_op
+from ..augment import transforms, types
 
 
 class ImageDataset(Dataset):
@@ -54,7 +17,7 @@ class ImageDataset(Dataset):
     """
 
     def __init__(self, path: Union[str, pathlib.Path],
-                 transform: Optional[albu.Compose] = None):
+                 transform: Optional[A.Compose] = None):
         """ImageDataset
 
         Args:
@@ -65,7 +28,7 @@ class ImageDataset(Dataset):
         # 数据集路径
         self.path = validator.data_protocol(path)
         # 数据集列表
-        self.dataset_list: List[dict] = file_io.load_json(self.path / f"{self.path.name}.json")
+        self.dataset_list: List[dict] = io.load_json(self.path / f"{self.path.name}.json")
         # 数据集要做的变换
         self.transform = transform
 
@@ -88,13 +51,13 @@ class ImageDataset(Dataset):
             gt_img_path = self.path.joinpath("gt", self.dataset_list[idx]["gt"])
 
         # 加载tp 和 gt 图像
-        tp_image: Image.Image = file_io.load_image(tp_img_path)
+        tp_image: Image.Image = io.load_image(tp_img_path)
         gt_image: Image.Image
 
         if gt_img_path is None:
             gt_image = Image.new("L", tp_image.size, 0)
         else:
-            gt_image = file_io.load_image(gt_img_path).convert("L")
+            gt_image = io.load_image(gt_img_path).convert("L")
 
         # 获取图像矩阵
         tp_array = img_op.to_numpy(tp_image, ensure_rgb=True)
@@ -123,7 +86,7 @@ class ImageDataset(Dataset):
 
 
 def create_dataloader(dataset_list: List[pathlib.Path],
-                      transform: Optional[albu.Compose],
+                      transform: Optional[A.Compose],
                       batchsize: int,
                       num_workers: int = 0,
                       shuffle: bool = True,
@@ -219,7 +182,7 @@ class OwlDataloader:
         paths = list(self.datasets_map.values())
         dataloader_train = create_dataloader(
             dataset_list=paths,
-            transform=img_aug.aug_compose(self.transform_pipeline),
+            transform=transforms.aug_compose(self.transform_pipeline),
             batchsize=self.batch_size,
             num_workers=self.num_workers,
             shuffle=self.shuffle,
@@ -242,7 +205,7 @@ class OwlDataloader:
         for k, v in self.datasets_map.items():
             dataloader_test[k] = create_dataloader(
                 dataset_list=[v],
-                transform=img_aug.aug_compose(self.transform_pipeline),
+                transform=transforms.aug_compose(self.transform_pipeline),
                 batchsize=self.batch_size,
                 num_workers=self.num_workers,
                 shuffle=self.shuffle,
@@ -251,3 +214,102 @@ class OwlDataloader:
             )
 
         return dataloader_test
+
+
+def build_owlDataloader(config: dict[str, Any]) -> OwlDataloader:
+    """根据嵌套配置字典构建数据加载器实例。
+    适配的 YAML 结构::
+        datasets_train:
+          path:
+            - "example"
+          batchsize: 12
+          epochs: 30
+          transform_pipeline:
+            - {type: rotate, param: {p: 0.5}}
+            - {type: vflip,  param: {p: 0.5}}
+            - {type: hflip,  param: {p: 0.5}}
+            - {type: jpeg,   param: {p: 0.3, quality_low: 70, quality_high: 100}}
+            - {type: gblur,  param: {p: 0.3, kernel_low: 3, kernel_high: 15}}
+            - {type: resize, param: {width: 512, height: 512}}
+          other:
+            num_workers: 4
+            shuffle: true
+            pin_memory: true
+            persistent_workers: true
+
+        datasets_validate:
+          path:
+            - "example"
+          batchsize: 1
+          transform_pipeline:
+            - {type: resize, param: {p: 1, width: 512, height: 512}}
+          custom_validate_func: "model.model.validate"
+          other:
+            num_workers: 1
+            shuffle: false
+            pin_memory: true
+            persistent_workers: true
+    Args:
+        config (dict[str, Any]): 配置字典，必须包含 path, batchsize, other, transform_pipeline。
+
+    Returns:
+        OwlDataloader: 配置好的数据加载器封装对象。
+
+    Raises:
+        KeyError: 如果配置中缺少必要的字段。
+    """
+    # 获取所有字段
+    try:
+        path_list = config["path"]
+        batch_size = config["batchsize"]
+        transform_pipeline_config = config["transform_pipeline"]
+        other_config = config["other"]
+
+        # 二级严格校验
+        num_workers = other_config["num_workers"]
+        shuffle = other_config["shuffle"]
+        pin_memory = other_config["pin_memory"]
+        persistent_workers = other_config["persistent_workers"]
+    except KeyError as e:
+        raise KeyError(f"配置文件校验失败: 缺少必填字段 {e}。请在 YAML 中显式定义该字段，如不需要可设为 null 或空列表。")
+
+    # 加载数据集路径，支持重复
+    datasets_map: dict[str, pathlib.Path] = {}
+    for p_str in path_list:
+        p = pathlib.Path(p_str).resolve()
+
+        # 初始 Key 为文件夹名
+        key_name = p.name
+
+        # 冲突检测与重命名逻辑
+        # 如果 datasets_map 中已经有了这个 key (说明用户在 list 中写了多次，或者不同路径同文件夹名)
+        # 我们给它加上后缀 _1, _2, _3 ... 直到唯一
+        if key_name in datasets_map:
+            original_name = key_name
+            counter = 1
+            while key_name in datasets_map:
+                key_name = f"{original_name}_{counter}"
+                counter += 1
+            # 此时 key_name 已经是唯一的了，例如 "nist16_1"
+
+        # 存入字典
+        datasets_map[key_name] = p
+
+    # 构建增强流水线
+    transform_pipeline: list[types.BaseAugConfig] = []
+    # 即使是空列表，代码也能正常运行，但必须要是 List 类型
+    if not isinstance(transform_pipeline_config, list):
+        raise TypeError(f"transform_pipeline 必须是列表格式，当前为: {type(transform_pipeline_config)}")
+
+    for ts in transform_pipeline_config:
+        transform_pipeline.append(transforms.dict2config(ts))
+
+    return OwlDataloader(
+        datasets_map=datasets_map,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        shuffle=shuffle,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
+        transform_pipeline=transform_pipeline,
+    )

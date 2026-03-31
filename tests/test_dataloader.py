@@ -1,3 +1,4 @@
+import owl.core.schemas
 from owl.core import dataset
 from pathlib import Path
 
@@ -10,7 +11,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import numpy as np
     for i, batch in enumerate(loader):
-        batch: dataset.DataSetBatch
+        batch: owl.core.schemas.DataSetBatch
         print(batch)
         tp, gt, tp_name, gt_name = (batch["tp_tensor"],
                                     batch["gt_tensor"],

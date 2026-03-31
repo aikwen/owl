@@ -1,4 +1,4 @@
-from owl.utils import file_io
+from owl.utils import io
 
 if __name__ == '__main__':
 

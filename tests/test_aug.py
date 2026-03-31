@@ -1,3 +1,4 @@
+import owl.core.schemas
 from owl.core import dataset
 from owl.utils import img_aug
 from owl.utils import types
@@ -22,7 +23,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import numpy as np
     for i, batch in enumerate(loader):
-        batch: dataset.DataSetBatch
+        batch: owl.core.schemas.DataSetBatch
         tp, gt, tp_name, gt_name = (batch["tp_tensor"],
                                     batch["gt_tensor"],
                                     batch["tp_name"],
