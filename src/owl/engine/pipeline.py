@@ -9,7 +9,7 @@ from ..toolkits.model.base import OwlModel
 
 
 class StepPipeline(StateMachine):
-    """Owl level 1
+    """Owl level 3
 
     处理单个 Batch 的完整生命周期（前向、算Loss、反向、更新）。
     """
@@ -26,9 +26,18 @@ class StepPipeline(StateMachine):
     scheduled = State(StepState.SCHEDULED.value)
     ended = State(StepState.ENDED.value)
 
-    # ==========================================
-    # 定义状态转移
-    # ==========================================
+    # ========================================================================
+    # 状态转移图
+    #
+    # +---------+   +-------------+   +------------------+   +---------------+
+    # | started |-->| grad_zeroed |-->| forward_computed |-->| loss_computed |
+    # +---------+   +-------------+   +------------------+   +---------------+
+    #      ^                                                         |
+    #      |      +-------+   +-----------+   +-------------------+  |
+    #      \------| ended |<--| scheduled |<--| backward_computed |<-/
+    #             +-------+   +-----------+   +-------------------+
+    #
+    # ========================================================================
     run_zero_grad = started.to(grad_zeroed)
     run_forward = grad_zeroed.to(forward_computed)
     run_compute_loss = forward_computed.to(loss_computed)
@@ -129,3 +138,7 @@ class StepPipeline(StateMachine):
         self.run_optimize()
         self.run_schedule()
         self.run_finish()
+
+        return {
+            "loss": self.ctx_loss.item() if self.ctx_loss is not None else 0.0,
+        }

@@ -5,7 +5,7 @@ import torch.nn as nn
 from ..data import types
 
 class OwlModel(nn.Module, ABC):
-    """Owl 引擎模型协议基类。
+    """Owl 模型基类。
     """
 
     @abstractmethod

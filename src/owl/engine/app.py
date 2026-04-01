@@ -182,7 +182,7 @@ class OwlApp(StateMachine):
                mode: ExecMode,
                max_epochs: int = 1,
                checkpoint_path: str = "",
-               device: str = "cuda",
+               device: str = "cpu",
 
                # ==========================================
                # 核心组件参数
@@ -204,7 +204,7 @@ class OwlApp(StateMachine):
                visualizer_name: str | None = None,
                visualizer_cfg: Dict[str, Any] | None = None):
         """
-        该方法会自动按照状态机的定义，依次触发组件装配 (setup)、硬件分配与权重加载 (init)、
+        该方法会自动按照状态机的定义，依次触发组件实例化 (instantiated)、硬件分配与权重加载 (instantiated)、
         启动第二层任务 (start)，并最终收尾完成任务 (complete)。。
 
         Args:
@@ -220,10 +220,10 @@ class OwlApp(StateMachine):
             optimizer_cfg (Dict[str, Any], optional): 传递给优化器构造函数的配置字典。默认为 None。
             scheduler_name (str | None, optional): 注册在 SCHEDULERS 中的学习率调度器名称。默认为 None。
             scheduler_cfg (Dict[str, Any] | None, optional): 学习率调度器配置字典。默认为 None。
-            owl_train_loader (OwlDataLoader | None, optional): 封装了训练集的加载器对象。默认为 None。
-            owl_val_loaders (OwlDataLoader | None, optional): 封装了验证集的加载器对象。默认为 None。
             visualizer_name (str | None, optional): 注册在 VISUALIZERS 中的可视化器名称。默认为 None。
             visualizer_cfg (Dict[str, Any] | None, optional): 可视化器配置字典。默认为 None。
+            owl_train_loader (OwlDataLoader | None, optional): 封装了训练集的加载器对象。默认为 None。
+            owl_val_loaders (OwlDataLoader | None, optional): 封装了验证集的加载器对象。默认为 None。
 
         Raises:
             Exception: 在装配、初始化或运行循环中抛出的任何底层运行时异常。捕获后状态机
@@ -249,21 +249,21 @@ class OwlApp(StateMachine):
         optimizer_cfg = optimizer_cfg or {}
 
         try:
-            # empty -> PENDING：实例化组件
+            # empty -> instantiated：实例化组件
             self.run_instantiate(
                 max_epochs=max_epochs,
                 model_name=model_name,             model_cfg=model_cfg,
                 criterion_name=criterion_name,     criterion_cfg=criterion_cfg,
                 optimizer_name=optimizer_name,     optimizer_cfg=optimizer_cfg,
-                owl_train_loader=owl_train_loader, owl_val_loaders=owl_val_loaders,
                 scheduler_name=scheduler_name,     scheduler_cfg=scheduler_cfg,
-                visualizer_name=visualizer_name,   visualizer_cfg=visualizer_cfg
+                visualizer_name=visualizer_name,   visualizer_cfg=visualizer_cfg,
+                owl_train_loader=owl_train_loader, owl_val_loaders=owl_val_loaders,
             )
 
-            # pending -> INITED： 加载权重、移动 device 之类的
+            # instantiated -> mounted： 加载权重、移动 device 之类的
             self.run_mount(mode=mode, checkpoint_path=checkpoint_path, device=device)
 
-            # inited -> RUNNING： 开始运行
+            # mounted -> RUNNING： 开始运行
             self.run_start(mode=mode, max_epochs=max_epochs)
 
             # RUNNING -> FINISHED： 结束

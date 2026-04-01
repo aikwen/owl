@@ -6,7 +6,7 @@ import torch.nn as nn
 
 
 class OwlVisualizer(nn.Module, ABC):
-    """可视化协议基类。
+    """可视化基类。
 
     将模型输出转换为最终的 [0, 1] 二值化图像张量。
     """

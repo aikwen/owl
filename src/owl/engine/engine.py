@@ -11,7 +11,7 @@ from ..toolkits.visual.base import OwlVisualizer
 from ..toolkits.data.types import DataSetBatch
 
 class OwlEngine(StateMachine):
-    """Owl level 1
+    """Owl level 2
 
     """
 
@@ -117,7 +117,8 @@ class OwlEngine(StateMachine):
 
             # 处于 TRAIN 节点
             if self.train_state.is_active:
-                self._do_train_epoch()      # 执行一个 Epoch 的训练
+                # 执行一个 Epoch 的训练
+                self._do_train_epoch()
 
                 # epoch 结束，同时 val_loaders 不为 None
                 if self.val_loaders:

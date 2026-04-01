@@ -7,7 +7,7 @@ from ..data import types
 
 
 class OwlCriterion(nn.Module, ABC):
-    """Owl 引擎损失函数协议基类。
+    """Owl 损失函数协议基类。
     """
 
     @abstractmethod
