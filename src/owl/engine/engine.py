@@ -4,10 +4,11 @@ from statemachine import StateMachine, State
 from typing import Optional, Any
 import torch
 
-from .state import EngineState, ExecState, ExecMode
+from .state import EngineState, ExecMode
 from .pipeline import StepPipeline
 from ..toolkits.model.base import OwlModel
 from ..toolkits.criterion.base import OwlCriterion
+from ..toolkits.visual.base import OwlVisualizer
 from ..toolkits.data.dataloader import OwlDataLoader
 from ..toolkits.data.types import DataSetBatch
 from ..toolkits.common import fs
@@ -45,10 +46,11 @@ class OwlEngine(StateMachine):
         self.criterion: OwlCriterion | None = None
         self.optimizer: torch.optim.Optimizer | None = None
         self.scheduler: Any | None = None
+        self.visualizer: OwlVisualizer|None = None
 
         # --- dataloader ---
         self.train_loader: DataLoader | None = None
-        self.val_loaders: dict[str, DataLoader] | None = None
+        self.val_loaders: dict[str, DataLoader]  = {}
 
         self.pipeline: StepPipeline | None = None
 
@@ -71,12 +73,14 @@ class OwlEngine(StateMachine):
                             optimizer:torch.optim.Optimizer,
                             scheduler:Any | None,
                             train_loader: OwlDataLoader | None,
-                            val_loader: OwlDataLoader | None):
+                            val_loader: OwlDataLoader | None,
+                            visualizer: Any | None = None,):
         """初始化组件"""
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
+        self.visualizer = visualizer
         if train_loader:
             self.train_loader: DataLoader = train_loader.get_train_loader()
         if val_loader:
@@ -102,7 +106,7 @@ class OwlEngine(StateMachine):
                     self.optimizer.load_state_dict(checkpoint["optimizer_state"])
                 if self.scheduler and "scheduler_state" in checkpoint:
                     self.scheduler.load_state_dict(checkpoint["scheduler_state"])
-                self.current_epoch = checkpoint["epoch"] + 1
+                self.current_epoch = checkpoint.get("epoch", -1) + 1
 
         # 实例化 pipline
         self.pipeline = StepPipeline(
@@ -124,6 +128,8 @@ class OwlEngine(StateMachine):
                 self._run_train_loop(max_epochs)
             elif self.current_mode == ExecMode.VALIDATE:
                 self._run_validate_loop()
+            elif self.current_mode == ExecMode.VISUALIZE:
+                self._run_visualize_loop()
 
             # 运行结束
             self.run_complete()
@@ -177,3 +183,18 @@ class OwlEngine(StateMachine):
                         current_epoch=self.current_epoch,
                         current_step=self.current_step
                     )
+
+    def _run_visualize_loop(self):
+        """可视化推理循环"""
+        self.model.eval()
+        with torch.no_grad():
+            for _, dataloader in self.val_loaders.items():
+                for batch_data in dataloader:
+                    batch_data: DataSetBatch
+                    batch_data['tp_tensors'] = batch_data['tp_tensors'].to(self.device, non_blocking=True)
+                    batch_data['gt_tensors'] = batch_data['gt_tensors'].to(self.device, non_blocking=True,)
+
+                    outputs = self.model(batch_data, self.current_epoch, self.current_step)
+
+                    if self.visualizer:
+                        _pred_masks = self.visualizer(outputs)
