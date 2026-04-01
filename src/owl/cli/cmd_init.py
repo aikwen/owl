@@ -7,10 +7,10 @@ TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
 def func(args):
     choices = [
-        Choice(title="训练 (train.yaml)", value="train.yaml"),
-        Choice(title="验证 (validate_metric.yaml)", value="validate_metric.yaml"),
-        Choice(title="鲁棒性 (validate_robust.yaml)", value="validate_robust.yaml"),
-        Choice(title="可视化 (visualization.yaml)", value="visualization.yaml"),
+        Choice(title="训练", value="train.py"),
+        Choice(title="验证", value="validate_metric.py"),
+        Choice(title="鲁棒性", value="validate_robust.py"),
+        Choice(title="可视化", value="visualization.py"),
     ]
     selected_template = questionary.select(
         message="请选择一个要生成的模板 (上下键移动，回车确认):",
@@ -50,9 +50,9 @@ def func(args):
 
         # 更新目标文件名和路径，准备下一次循环检测
         target_filename = new_name.strip()
-        # 补全后缀 (如果用户忘了写 .yaml)
-        if not target_filename.endswith(".yaml"):
-            target_filename += ".yaml"
+        # 补全后缀
+        if not target_filename.endswith(".py"):
+            target_filename += ".py"
 
         dst_path = current_cwd / target_filename
 

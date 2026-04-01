@@ -1,5 +1,5 @@
 import argparse
-from . import cmd_version, cmd_init, cmd_run
+from . import cmd_version, cmd_init
 
 def main():
     parser = argparse.ArgumentParser(
@@ -26,28 +26,3 @@ def main():
         name="version",
         help="查看版本号")
     parser_version.set_defaults(func=cmd_version.func)
-
-    # ==========================================
-    # 子命令: run (运行配置文件)
-    # ==========================================
-    parser_run = subparsers.add_parser(
-        name="run",
-        help="运行配置文件")
-
-    # 添加一个位置参数
-    parser_run.add_argument(
-        "file",  # 参数名
-        type=str,  # 类型
-        help="配置文件路径 (例如: train.yaml)"
-    )
-
-    parser_run.set_defaults(func=cmd_run.func)
-
-    # ==========================================
-    # 解析并执行
-    # ==========================================
-    args = parser.parse_args()
-    if hasattr(args, "func"):
-        args.func(args)
-    else:
-        parser.print_help()
