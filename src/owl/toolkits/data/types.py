@@ -52,7 +52,7 @@ class DataSetBatch(TypedDict):
     gt_names: list[str]
 
 
-class DataLoaderConfig(TypedDict, total=False):
+class DataLoaderConfig(TypedDict):
     """DataLoader 的配置参数字典。
 
     Attributes:
