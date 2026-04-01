@@ -9,13 +9,11 @@ except ImportError:
 
 # IDE 提示
 if TYPE_CHECKING:
-    from . import core
     from . import utils
     from . import augment
 
 
 _delayed_imports = {
-    "core": ".core",
     "utils": ".utils",
     "augment": ".augment",
 }
@@ -30,8 +28,5 @@ def __getattr__(name:str):
 
 
 __all__ = [
-    "core",
-    "utils",
-    "augment",
     "__version__",
 ]
