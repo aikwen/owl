@@ -5,28 +5,25 @@ class ExecMode(str, Enum):
     VALIDATE = "validate"
     VISUALIZE = "visualization"
 
-class EngineState(str, Enum):
+class AppState(str, Enum):
     """整个 OwlEngine 的生命周期状态
     """
-    EMPTY = "engine_empty"      # 仅初始化，无组件
-    PENDING = "engine_pending"  # 组件已注入
-    INITED = "engine_inited"    # 分配 Device，加载权重
-    RUNNING = "engine_running"
-    FINISHED = "engine_finished"
-    ERROR = "engine_error"
+    EMPTY = "app_empty"      # 仅初始化，无组件
+    INSTANTIATED = "app_instantiated"  # 初始化组件
+    MOUNTED = "app_mounted"    # 分配 Device，加载权重
+    RUNNING = "app_running"
+    FINISHED = "app_finished"
+    ERROR = "app_error"
 
 
 class ExecState(str, Enum):
-    """定义在特定 Mode 下的任务流转与 Epoch 调度。
-    """
-    EXEC_STARTED = "exec_started"
-    EPOCH_STARTED = "epoch_started"
-    MODE_TRAINING = "mode_training"
-    MODE_VALIDATING = "mode_validating"
-    MODE_VISUALIZING = "mode_visualizing"
-    EPOCH_SAVING = "epoch_saving"
-    EPOCH_ENDED = "epoch_ended"
-    EXEC_ENDED = "exec_ended"
+    """完全对应多态路由图的节点"""
+    START = "start"
+    ROUTING = "routing"  # 路由分支
+    TRAIN = "train"
+    VALIDATE = "validate"
+    VISUAL = "visual"
+    END = "end"          # 结束
 
 
 class StepState(str, Enum):

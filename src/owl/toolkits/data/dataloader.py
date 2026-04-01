@@ -1,5 +1,5 @@
 import pathlib
-from typing import List, Dict, Union, Optional
+from typing import List, Dict, Union
 import torch
 from torch.utils.data import DataLoader, ConcatDataset
 

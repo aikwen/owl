@@ -1,4 +1,4 @@
-from typing import TypedDict, Any, Optional
+from typing import TypedDict, Any
 
 class CheckpointDict(TypedDict):
     """定义保存到 .pth 文件中的权重字典结构。

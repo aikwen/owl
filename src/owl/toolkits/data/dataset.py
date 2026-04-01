@@ -14,8 +14,8 @@ class ImageDataset(Dataset):
     def __init__(self,
                  root_dir: Union[str, pathlib.Path],
                  collector_fn: DataCollectorFunc,
-                 collector_kwargs: Optional[Dict[str, Any]] = None,
-                 transform: Optional[A.Compose] = None):
+                 collector_kwargs: Dict[str, Any]| None = None,
+                 transform: A.Compose|None = None):
         """
         Args:
             root_dir (Union[str, pathlib.Path]): 数据集根目录。

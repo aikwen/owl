@@ -1,5 +1,5 @@
 from statemachine import StateMachine, State
-from typing import Any, Dict, Optional
+from typing import Any
 import torch
 
 from .state import StepState
@@ -9,7 +9,9 @@ from ..toolkits.model.base import OwlModel
 
 
 class StepPipeline(StateMachine):
-    """处理单个 Batch 的完整生命周期（前向、算Loss、反向、更新）。
+    """Owl level 1
+
+    处理单个 Batch 的完整生命周期（前向、算Loss、反向、更新）。
     """
 
     # ==========================================

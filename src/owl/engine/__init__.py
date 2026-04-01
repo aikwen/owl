@@ -2,13 +2,13 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from . import engine
+    from . import app
     from . import pipeline
     from . import state
 
 _delayed_imports = {
     "engine": ".engine",
-    "pipline": ".pipline",
+    "pipline": ".pipeline",
     "state": ".state",
 }
 
@@ -22,7 +22,7 @@ def __getattr__(name:str):
     raise AttributeError(f"module 'core' has no attribute '{name}'")
 
 
-__all__ = ["engine",
+__all__ = ["app.py",
            "pipeline",
            "state",
            ]
