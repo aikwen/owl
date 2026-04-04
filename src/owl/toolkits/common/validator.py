@@ -30,7 +30,7 @@ def data_protocol(path: Union[str, Path]) -> Path:
         FileNotFoundError:
         ValueError: 当 JSON 文件存在但无法被解析（格式错误）时抛出。
     """
-    # 1. 基础类型与路径检查
+    # 基础类型与路径检查
     if not isinstance(path, (str, Path)):
         raise TypeError(f"路径必须是 str 或 pathlib.Path 类型，收到: {type(path)}")
 
@@ -38,7 +38,7 @@ def data_protocol(path: Union[str, Path]) -> Path:
     if not p.is_dir():
         raise FileNotFoundError(f"数据集根目录不存在: {p}")
 
-    # 2. 检查核心文件夹结构
+    # 检查核心文件夹结构
     gt_dir = p / "gt"
     tp_dir = p / "tp"
     if not gt_dir.is_dir():
@@ -46,12 +46,12 @@ def data_protocol(path: Union[str, Path]) -> Path:
     if not tp_dir.is_dir():
         raise FileNotFoundError(f"协议校验失败: 缺失 'tp' 文件夹 -> {tp_dir}")
 
-    # 3. 检查 JSON 文件是否存在
+    # 检查 JSON 文件是否存在
     json_file = p / f"{p.name}.json"
     if not json_file.is_file():
         raise FileNotFoundError(f"协议校验失败: 缺失描述文件 -> {json_file}")
 
-    # 4. 检查 JSON 内容有效性
+    # 检查 JSON 内容有效性
     try:
         with open(json_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
