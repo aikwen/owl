@@ -1,8 +1,8 @@
-# src/owl/toolkits/visual/base.py
 from abc import ABC, abstractmethod
-from typing import Any
 import torch
 import torch.nn as nn
+
+from ..model.types import ModelOutput
 
 
 class OwlVisualizer(nn.Module, ABC):
@@ -12,7 +12,7 @@ class OwlVisualizer(nn.Module, ABC):
     """
 
     @abstractmethod
-    def forward(self, model_outputs: Any) -> torch.Tensor:
+    def forward(self, model_outputs: ModelOutput) -> torch.Tensor:
         """执行可视化处理逻辑。
 
         Returns:
