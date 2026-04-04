@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any
 import torch
 import torch.nn as nn
 
 from ..data import types
+from ..model.types import ModelOutput
 
 
 class OwlCriterion(nn.Module, ABC):
@@ -11,12 +11,12 @@ class OwlCriterion(nn.Module, ABC):
     """
 
     @abstractmethod
-    def forward(self, model_outputs: Any, batch_data: types.DataSetBatch, current_epoch: int = 0, current_step: int = 0,
+    def forward(self, model_outputs: ModelOutput, batch_data: types.DataSetBatch, current_epoch: int = 0, current_step: int = 0,
                 **kwargs) -> torch.Tensor:
         """计算模型预测结果与真实标签之间的损失值。
 
         Args:
-            model_outputs (Any): 模型 forward 方法的返回值。
+            model_outputs (ModelOutput): 模型 forward 方法的返回值。
             batch_data (types.DataSetBatch): 包含当前批次数据的字典。
             current_epoch (int, optional): 当前所处的训练轮次 (Epoch)。
             current_step (int, optional): 当前所处的全局batch数 (Step)。默认为 0。

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from .types import ModelOutput
 import torch.nn as nn
 
 from ..data import types
@@ -9,7 +9,7 @@ class OwlModel(nn.Module, ABC):
     """
 
     @abstractmethod
-    def forward(self, batch_data: types.DataSetBatch, current_epoch: int = 0, current_step: int = 0, **kwargs) -> Any:
+    def forward(self, batch_data: types.DataSetBatch, current_epoch: int = 0, current_step: int = 0, **kwargs) -> ModelOutput:
         """执行模型的前向传播逻辑。
 
         Args:
@@ -20,8 +20,17 @@ class OwlModel(nn.Module, ABC):
             **kwargs: 保留字典，用于接收未来框架可能会下发的其他扩展上下文参数。
 
         Returns:
-            Any: 模型的预测结果。建议返回 Dict[str, torch.Tensor] 格式
-            （例如: {"mask": mask_pred, "cls": cls_pred}），以优雅地支持多头网络输出，
-            但为保证兼容性，也允许返回单一的 torch.Tensor 或 Tuple。
+            ModelOutput: 模型的输出，实际上是一个字典，必须包含 prediction key，作为 Evaluator 自动提取结果；
+            比如::
+                >>> class Model(OwlModel):
+                >>>     def __init__(self, ...):
+                >>>         super().__init__()
+                >>>         ...
+                >>>     def forward(self, batch_data: types.DataSetBatch, current_epoch: int = 0, current_step: int = 0,**kwargs) -> ModelOutput:
+                >>>         ...
+                >>>         return {
+                >>>             "prediction": ...
+                >>>         }
+
         """
         pass
