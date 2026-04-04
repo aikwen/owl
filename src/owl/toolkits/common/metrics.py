@@ -186,10 +186,14 @@ class AUCSingleProtocol(Protocol):
     计算单张图片的 auc 函数签名
     """
     def __call__(self, gt_prob: torch.Tensor, predict_prob: torch.Tensor) -> float:
-        """
-        Calculate AUC score for a single image.
-        :param gt_prob: gt 概率图，值范围是 0 和 1; shape: [1, H, W] 或者 [H, W]
-        :param predict_prob: 预测概率图， 值的范围是 [0, 1] 之间，不需要二值化; shape: [1, H, W] 或者 [H, W]
+        """计算单张图片的 AUC 分数。
+
+        Args:
+            gt_prob (torch.Tensor): 标签概率图，元素为 0 或 1。
+            predict_prob (torch.Tensor): 预测概率图，值范围在 [0, 1] 之间。
+
+        Returns:
+            float: 计算得到的 AUC 分数。
         """
         ...
 
