@@ -40,7 +40,7 @@ def func(args):
         # 让用户输入新名字
         new_name = questionary.text(
             "请输入新的文件名 (留空则取消):",
-            default=f"new_{target_filename}"  # 给个默认建议，体验更好
+            default=f"{target_filename}"
         ).ask()
 
         # 如果用户没输入直接取消
@@ -48,18 +48,17 @@ def func(args):
             print("操作已取消。")
             return
 
-        # 更新目标文件名和路径，准备下一次循环检测
+        # 更新目标文件名和路径并补全后缀
         target_filename = new_name.strip()
-        # 补全后缀
         if not target_filename.endswith(".py"):
             target_filename += ".py"
 
         dst_path = current_cwd / target_filename
 
-    # 执行复制
+    # 复制
     try:
         shutil.copy(src_path, dst_path)
-        print(f"\n[成功] 已生成文件: {dst_path.name}")
+        print(f"\n[success] 已生成文件: {dst_path.name}")
         print(f"   路径: {dst_path}")
     except Exception as e:
-        print(f"[失败] 无法写入文件: {e}")
+        print(f"[fail] 无法写入文件: {e}")
