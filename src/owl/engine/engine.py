@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 
 from statemachine import StateMachine, State
 from .state import ExecMode, ExecState, StepState
-from .pipeline import StepPipeline
+from .pipeline import TrainStepPipeline
 from ..toolkits.model.base import OwlModel
 from ..toolkits.criterion.base import OwlCriterion
 from ..toolkits.visual.base import OwlVisualizer
@@ -81,7 +81,7 @@ class OwlEngine(StateMachine):
         # 设备
         self.device: torch.device = torch.device("cpu")
 
-        self.pipeline: StepPipeline | None = None
+        self.train_pipeline: TrainStepPipeline | None = None
         # 运行时上下文
         self.current_mode: ExecMode | None = None
         self.current_epoch: int = 0
@@ -155,7 +155,7 @@ class OwlEngine(StateMachine):
         """初始化 pipeline
         :return:
         """
-        self.pipeline = StepPipeline(
+        self.train_pipeline = TrainStepPipeline(
             model=self.model,
             criterion=self.criterion,
             optimizer=self.optimizer,
@@ -169,7 +169,7 @@ class OwlEngine(StateMachine):
         for batch_id, batch_data in enumerate(self.train_loader):
             batch_data: DataSetBatch
             self.current_step += 1
-            self.pipeline.do_step_flow(batch_data, self.current_epoch, self.current_step)
+            self.train_pipeline.do_step_flow(batch_data, self.current_epoch, self.current_step)
 
     def _do_validate(self):
         self.model.eval()

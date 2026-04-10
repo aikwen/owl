@@ -8,7 +8,7 @@ from ..toolkits.data.types import DataSetBatch
 from ..toolkits.model.base import OwlModel
 
 
-class StepPipeline(StateMachine):
+class TrainStepPipeline(StateMachine):
     """Owl level 3
 
     处理单个 Batch 的完整生命周期（前向、算Loss、反向、更新）。
