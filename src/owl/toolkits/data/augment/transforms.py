@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Union
 
 import albumentations as albu
 from .types import (BaseAugConfig,
@@ -47,7 +47,7 @@ def config2transform(cfg: BaseAugConfig) -> albu.BasicTransform:
 
 AugmentItemType = Union[albu.BasicTransform, BaseAugConfig]
 
-def aug_compose(aug_list: List[AugmentItemType]) -> albu.Compose | None:
+def aug_compose(aug_list: list[AugmentItemType]) -> albu.Compose | None:
     """
     获取转换组合
     :param aug_list:
@@ -56,7 +56,7 @@ def aug_compose(aug_list: List[AugmentItemType]) -> albu.Compose | None:
     if aug_list is None or len(aug_list) <= 0:
         return None
 
-    l : List[albu.BasicTransform] = []
+    l : list[albu.BasicTransform] = []
 
     for aug in aug_list:
         if isinstance(aug, albu.BasicTransform):

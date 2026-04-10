@@ -1,5 +1,5 @@
 import pathlib
-from typing import List, Dict, Union
+from typing import Union
 import torch
 from torch.utils.data import DataLoader, ConcatDataset
 
@@ -16,18 +16,18 @@ class OwlDataLoader:
     """
 
     def __init__(self,
-                 dataset_paths: List[Union[str, pathlib.Path]],
+                 dataset_paths: list[Union[str, pathlib.Path]],
                  dataloader_config: DataLoaderConfig,
-                 aug_configs: List[BaseAugConfig] | None,
+                 aug_configs: list[BaseAugConfig] | None,
                  ):
 
         self.config = dataloader_config
         self.transform = aug_compose(aug_configs) if aug_configs else None
 
-        self.datasets_map: Dict[str, ImageDataset] = {}
+        self.datasets_map: dict[str, ImageDataset] = {}
         self._init_datasets(dataset_paths)
 
-    def _init_datasets(self, dataset_paths: List[Union[str, pathlib.Path]]):
+    def _init_datasets(self, dataset_paths: list[Union[str, pathlib.Path]]):
         for p in dataset_paths:
             path = pathlib.Path(p).resolve()
 
@@ -66,7 +66,7 @@ class OwlDataLoader:
         else:
             return (self.total_samples + batch_size - 1) // batch_size
 
-    def get_dataset_info(self) -> Dict[str, int]:
+    def get_dataset_info(self) -> dict[str, int]:
         """返回各个数据集的具体样本数量"""
         return {name: len(ds) for name, ds in self.datasets_map.items()}
 
@@ -93,7 +93,7 @@ class OwlDataLoader:
             drop_last=use_drop_last,
         )
 
-    def get_valid_loaders(self) -> Dict[str, DataLoader]:
+    def get_valid_loaders(self) -> dict[str, DataLoader]:
         """
         验证模式：保持数据集独立，返回 Dict[str, DataLoader]
         """

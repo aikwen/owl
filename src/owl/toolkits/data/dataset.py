@@ -1,5 +1,5 @@
 import pathlib
-from typing import Union, Optional, Callable, List, Dict, Any
+from typing import Union, Optional, Callable, Any
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
@@ -7,20 +7,20 @@ import albumentations as A
 
 from .types import DataRecord, DataSetItem
 from ..common import fs, image
-DataCollectorFunc = Callable[..., List[DataRecord]]
+DataCollectorFunc = Callable[..., list[DataRecord]]
 
 
 class ImageDataset(Dataset):
     def __init__(self,
                  root_dir: Union[str, pathlib.Path],
                  collector_fn: DataCollectorFunc,
-                 collector_kwargs: Dict[str, Any]| None = None,
+                 collector_kwargs: dict[str, Any]| None = None,
                  transform: A.Compose|None = None):
         """
         Args:
             root_dir (Union[str, pathlib.Path]): 数据集根目录。
             collector_fn (DataCollectorFunc): 映射函数。
-            collector_kwargs (Optional[Dict[str, Any]]): 映射函数参数。
+            collector_kwargs (Optional[dict[str, Any]]): 映射函数参数。
             transform (Optional[A.Compose]): Albumentations 增强流水线。
         """
         self.root_dir = pathlib.Path(root_dir).resolve()
@@ -28,7 +28,7 @@ class ImageDataset(Dataset):
 
         # 获取所有参数
         kwargs = collector_kwargs or {}
-        self.data_records: List[DataRecord] = collector_fn(self.root_dir, **kwargs)
+        self.data_records: list[DataRecord] = collector_fn(self.root_dir, **kwargs)
 
         if not self.data_records:
             raise ValueError(f"Dataset root '{root_dir}' is empty or collector returned nothing.")

@@ -1,10 +1,9 @@
 import pathlib
-from typing import List
 from ..types import DataRecord
 from ...common import fs
 
 
-def from_owl_json(root: pathlib.Path | str, json_name: str | None = None) -> List[DataRecord]:
+def from_owl_json(root: pathlib.Path | str, json_name: str | None = None) -> list[DataRecord]:
     """Owl 协议数据集解析器。
 
         解析 root 目录下的索引 JSON 文件并返回绝对路径列表。
@@ -49,7 +48,7 @@ def from_owl_json(root: pathlib.Path | str, json_name: str | None = None) -> Lis
 
     raw_data = fs.load_json(json_path)
 
-    records: List[DataRecord] = []
+    records: list[DataRecord] = []
     for item in raw_data:
         records.append({
             "tp": str((root_path / "tp" / item["tp"]).resolve()),

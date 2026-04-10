@@ -1,5 +1,4 @@
 from statemachine import StateMachine, State
-from typing import Any
 import torch
 
 from .state import StepState

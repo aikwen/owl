@@ -3,8 +3,9 @@ import torch
 from torch.utils.data import DataLoader
 
 from statemachine import StateMachine, State
-from .state import ExecMode, ExecState, StepState
+from .state import ExecMode, ExecState
 from .pipeline import TrainStepPipeline
+from ..toolkits.evaluator.base import OwlEvaluator
 from ..toolkits.model.base import OwlModel
 from ..toolkits.criterion.base import OwlCriterion
 from ..toolkits.visual.base import OwlVisualizer
@@ -64,6 +65,7 @@ class OwlEngine(StateMachine):
                  scheduler: Any | None,
                  train_loader: DataLoader | None,
                  val_loaders:  dict[str, DataLoader] | None,
+                 evaluator: OwlEvaluator | None = None,
                  visualizer:   OwlVisualizer | None = None,):
 
         # 必要的组件
@@ -72,6 +74,7 @@ class OwlEngine(StateMachine):
         self.optimizer:  torch.optim.Optimizer | None = optimizer
         self.scheduler:  Any | None = scheduler
         self.visualizer: OwlVisualizer | None  = visualizer
+        self.evaluator = evaluator
 
         # 数据集
         self.train_loader: DataLoader | None = train_loader
@@ -174,6 +177,8 @@ class OwlEngine(StateMachine):
         self.model.eval()
         with torch.no_grad():
             for dataset_name, dataloader in self.val_loaders.items():
+                if self.evaluator:
+                    self.evaluator.reset()
                 for batch_data in dataloader:
                     batch_data: DataSetBatch
                     batch_data['tp_tensors'] = batch_data['tp_tensors'].to(self.device, non_blocking=True,)
@@ -184,7 +189,11 @@ class OwlEngine(StateMachine):
                         current_epoch=self.current_epoch,
                         current_step=self.current_step
                     )
-                    # TODO:计算 AUC，F1-score .... 之类的
+                    if self.evaluator:
+                        self.evaluator.update(outputs, batch_data)
+                if self.evaluator:
+                    metrics_result = self.evaluator.compute()
+                    # TODO: 保存或者log metric 结果
 
 
     def _do_visualize(self):
