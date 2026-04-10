@@ -54,7 +54,6 @@ class OwlEngine(StateMachine):
     event_validate_to_train = validate_state.to(train_state)
 
     # 指向结束
-    event_train_to_end = train_state.to(end_state)
     event_validate_to_end = validate_state.to(end_state)
     event_visual_to_end = visual_state.to(end_state)
 
