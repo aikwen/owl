@@ -1,3 +1,5 @@
+from typing import Any
+
 from statemachine import StateMachine, State
 import torch
 
@@ -112,7 +114,7 @@ class TrainStepPipeline(StateMachine):
         """"""
         pass
 
-    def do_step_flow(self, batch_data: DataSetBatch, current_epoch: int = 0, current_step: int = 0):
+    def do_step_flow(self, batch_data: DataSetBatch, current_epoch: int = 0, current_step: int = 0) -> dict[str, Any]:
         """
 
         Args:
@@ -140,4 +142,5 @@ class TrainStepPipeline(StateMachine):
 
         return {
             "loss": self.ctx_loss.item() if self.ctx_loss is not None else 0.0,
+            "lr": self.optimizer.param_groups[0]['lr'],
         }

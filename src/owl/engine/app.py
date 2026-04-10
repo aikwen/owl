@@ -237,6 +237,10 @@ class OwlApp(StateMachine):
             self.event_fail()
             raise e
 
+    def on_event_complete(self):
+        from ..toolkits.common.logger import OwlLogger
+        OwlLogger.stop()
+
     def before_event_instantiate(self, **kwargs):
         """event_instantiate hook
 
@@ -356,6 +360,11 @@ class OwlApp(StateMachine):
         """Empty -> Instantiated：只用来实例化组件
         """
         self.work_dir = work_dir
+        # 打印日志
+        from ..toolkits.common.logger import OwlLogger
+        OwlLogger.setup(work_dir=self.work_dir)
+        OwlLogger.welcome()
+
         self.model = MODELS.build(model_name, **model_cfg)
         self.criterion = CRITERIA.build(criterion_name, **criterion_cfg)
 
@@ -400,3 +409,4 @@ class OwlApp(StateMachine):
 
         if evaluator_name:
             self.evaluator = EVALUATORS.build(evaluator_name, **(evaluator_cfg or {}))
+

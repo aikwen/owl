@@ -11,6 +11,7 @@ from ..toolkits.model.base import OwlModel
 from ..toolkits.criterion.base import OwlCriterion
 from ..toolkits.visualizer.base import OwlVisualizer
 from ..toolkits.data.types import DataSetBatch
+from ..toolkits.common.logger import logger
 
 class OwlEngine(StateMachine):
     """Owl level 2
@@ -77,7 +78,7 @@ class OwlEngine(StateMachine):
         self.scheduler:  Any | None = scheduler
         self.visualizer: OwlVisualizer | None  = visualizer
         self.evaluator = evaluator
-        self.work_dir: pathlib.Path = work_dir
+        self.work_dir: pathlib.Path = pathlib.Path(work_dir)
 
         # 数据集
         self.train_loader: DataLoader | None = train_loader
@@ -108,6 +109,8 @@ class OwlEngine(StateMachine):
         self.device = torch.device(device)
 
         # Start -> routing_state
+        logger.bind(mode="train").info(
+            f"模式: <yellow>{mode.value.upper()}</yellow> | 设备: <yellow>{self.device}</yellow> | 目标 Epochs: <yellow>{self.max_epochs}</yellow>")
         self.event_start_to_routing()
 
         if mode == ExecMode.TRAIN:
@@ -170,13 +173,24 @@ class OwlEngine(StateMachine):
         )
 
     def _do_train_epoch(self):
+        logger.bind(mode="train").info(f"--- 开始 Epoch [{self.current_epoch}/{self.max_epochs - 1}] 训练 ---")
         self.model.train()
+        total_batches = len(self.train_loader)
         for batch_id, batch_data in enumerate(self.train_loader):
             batch_data: DataSetBatch
             self.current_step += 1
-            self.train_pipeline.do_step_flow(batch_data, self.current_epoch, self.current_step)
+            res = self.train_pipeline.do_step_flow(batch_data, self.current_epoch, self.current_step)
+            if (batch_id + 1) % 10 == 0 or (batch_id + 1) == total_batches:
+                loss_val = res.get("loss", 0.0)
+                lr_val = res.get("lr", 0.0)
+                logger.bind(mode="train").info(
+                    f"Epoch [{self.current_epoch}] | Batch [{batch_id + 1}/{total_batches}] "
+                    f"| Loss: <red>{loss_val:.4f}</red> | LR: <cyan>{lr_val:.6f}</cyan>"
+                )
 
     def _do_validate(self):
+        logger.bind(mode="val").info(f"--- 开始 Epoch [{self.current_epoch}] 验证 ---")
+        epoch_metrics = {}
         self.model.eval()
         with torch.no_grad():
             for dataset_name, dataloader in self.val_loaders.items():
@@ -194,11 +208,15 @@ class OwlEngine(StateMachine):
                     )
                     if self.evaluator:
                         self.evaluator.update(outputs, batch_data)
-                # 单个数据集统计完毕后：
+                # 单个数据集统计
                 if self.evaluator:
-                    metrics_result = self.evaluator.compute()
-                    # TODO: 保存或者log metric 结果
+                    epoch_metrics[dataset_name] = self.evaluator.compute()
 
+            if epoch_metrics:
+                from ..toolkits.common.fmt import format_metrics_table
+                table_str = format_metrics_table(epoch_metrics, current_epoch=self.current_epoch)
+                if table_str:
+                    logger.bind(mode="val").opt(raw=True).info(table_str)
 
     def _do_visualize(self):
         self.model.eval()
