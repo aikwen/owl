@@ -29,7 +29,8 @@ class OwlModel(nn.Module, ABC):
                 >>>     def forward(self, batch_data: types.DataSetBatch, current_epoch: int = 0, current_step: int = 0,**kwargs) -> ModelOutput:
                 >>>         ...
                 >>>         return {
-                >>>             "prediction": ...
+                >>>             "logits": torch.tensor([1,2,3]),
+                                "other": ...,
                 >>>         }
 
         """

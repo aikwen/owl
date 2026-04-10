@@ -191,6 +191,7 @@ class OwlEngine(StateMachine):
                     )
                     if self.evaluator:
                         self.evaluator.update(outputs, batch_data)
+                # 单个数据集统计完毕后：
                 if self.evaluator:
                     metrics_result = self.evaluator.compute()
                     # TODO: 保存或者log metric 结果
@@ -199,7 +200,7 @@ class OwlEngine(StateMachine):
     def _do_visualize(self):
         self.model.eval()
         with torch.no_grad():
-            for _, dataloader in self.val_loaders.items():
+            for dataset_name, dataloader in self.val_loaders.items():
                 for batch_data in dataloader:
                     batch_data: DataSetBatch
                     batch_data['tp_tensors'] = batch_data['tp_tensors'].to(self.device, non_blocking=True, )
@@ -211,5 +212,8 @@ class OwlEngine(StateMachine):
                         current_step=self.current_step
                     )
                     if self.visualizer:
-                        _pred_masks = self.visualizer(outputs)
-                        # TODO:保存图片到文件夹
+                        self.visualizer(
+                            batch_data=batch_data,
+                            outputs=outputs,
+                            dataset_name=dataset_name
+                        )
