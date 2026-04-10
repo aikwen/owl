@@ -21,8 +21,7 @@ dependencies = [
     "PyYAML>=6.0.2",
     "colorama>=0.4.5",
     "prettytable>=3.17.0",
-    "python-statemachine",
-    "typing_extensions"
+    "python-statemachine>=3.0.0",
 ]
 
 [project.scripts]

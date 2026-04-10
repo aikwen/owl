@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
 from ..data.types import DataSetBatch
-
+from ..model.types import ModelOutput
 class OwlEvaluator(ABC):
     """Owl 评估器基类"""
 
@@ -11,11 +10,11 @@ class OwlEvaluator(ABC):
         pass
 
     @abstractmethod
-    def update(self, outputs: Any, batch_data: DataSetBatch):
+    def update(self, outputs: ModelOutput, batch_data: DataSetBatch):
         """在每个 Batch 结束后调用，收集预测值和真实标签"""
         pass
 
     @abstractmethod
-    def compute(self) -> Dict[str, float]:
+    def compute(self) -> dict[str, float]:
         """在 DataLoader 结束后调用，计算并返回最终指标字典"""
         pass
