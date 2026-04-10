@@ -66,6 +66,7 @@ class OwlApp(StateMachine):
         self.visualizer: OwlVisualizer | None = None
         self.evaluator: OwlEvaluator | None = None
         self.work_dir: pathlib.Path | None = None
+        self.ckpt_autosave: bool = False
 
         self.train_loader: DataLoader | None = None
         self.val_loaders: dict[str, DataLoader] | None = {}
@@ -122,6 +123,7 @@ class OwlApp(StateMachine):
             visualizer=self.visualizer,
             evaluator = self.evaluator,
             work_dir=self.work_dir,
+            ckpt_autosave=self.ckpt_autosave,
         )
 
         self.engine.run(
@@ -136,6 +138,7 @@ class OwlApp(StateMachine):
                mode: ExecMode,
                # 模型名称
                model_name: str,
+               ckpt_autosave: bool = False,
                # 损失函数
                criterion_name: str = "",
                # 优化器
@@ -214,6 +217,7 @@ class OwlApp(StateMachine):
             # empty -> instantiated：实例化组件
             self.event_instantiate(
                 work_dir="",
+                ckpt_autosave=ckpt_autosave,
                 max_epochs=max_epochs,
                 model_name=model_name,             model_cfg=model_cfg,
                 criterion_name=criterion_name,     criterion_cfg=criterion_cfg,
@@ -348,6 +352,7 @@ class OwlApp(StateMachine):
     def on_event_instantiate(self,
                      work_dir: pathlib.Path,
                      max_epochs: int,
+                     ckpt_autosave: bool,
                      model_name: str, model_cfg: dict[str, Any],
                      criterion_name: str, criterion_cfg: dict[str, Any],
                      optimizer_name: str, optimizer_cfg: dict[str, Any],
@@ -360,6 +365,7 @@ class OwlApp(StateMachine):
         """Empty -> Instantiated：只用来实例化组件
         """
         self.work_dir = work_dir
+        self.ckpt_autosave = ckpt_autosave
         # 打印日志
         from ..toolkits.common.logger import OwlLogger
         OwlLogger.setup(work_dir=self.work_dir)

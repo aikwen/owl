@@ -64,6 +64,7 @@ class OwlEngine(StateMachine):
                  model: OwlModel,
                  criterion: OwlCriterion | None,
                  work_dir: str | pathlib.Path,
+                 ckpt_autosave: bool,
                  optimizer: torch.optim.Optimizer | None,
                  scheduler: Any | None,
                  train_loader: DataLoader | None,
@@ -79,6 +80,7 @@ class OwlEngine(StateMachine):
         self.visualizer: OwlVisualizer | None  = visualizer
         self.evaluator = evaluator
         self.work_dir: pathlib.Path = pathlib.Path(work_dir)
+        self.ckpt_autosave = ckpt_autosave
 
         # 数据集
         self.train_loader: DataLoader | None = train_loader
