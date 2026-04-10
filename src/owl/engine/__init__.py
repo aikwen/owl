@@ -24,8 +24,9 @@ def __getattr__(name:str):
     raise AttributeError(f"module 'core' has no attribute '{name}'")
 
 
-__all__ = ["app",
-           "engine",
-           "pipeline",
-           "state",
-           ]
+__all__ = [
+    "app",
+    "engine",
+    "pipeline",
+    "state",
+]
