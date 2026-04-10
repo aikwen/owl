@@ -29,7 +29,7 @@ pip install numpy Pillow albumentations
 Run the following command in any directory to generate a training script (e.g., `my_project.py`):
 
 ```bash
-owl init my_project
+owl init
 ```
 
 ## Dataset Structure
