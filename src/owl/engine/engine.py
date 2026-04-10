@@ -34,7 +34,7 @@ class OwlEngine(StateMachine):
     #                                /       |            ^        \
     #                               /        v            |         v
     # +-------------+   +---------------+  +----------------+    +-----------+
-    # | start_state |-->| routing_state |->|  train_state   |--->| end_state |
+    # | start_state |-->| routing_state |->|  train_state   |    | end_state |
     # +-------------+   +---------------+  +----------------+    +-----------+
     #                               \                            ^
     #                                \     +----------------+   /
@@ -42,21 +42,21 @@ class OwlEngine(StateMachine):
     #                                      +----------------+
     # ========================================================================
 
-    run_route = start_state.to(routing_state)
+    event_start_to_routing = start_state.to(routing_state)
 
     # 路由
-    run_route_to_train = routing_state.to(train_state)
-    run_route_to_validate = routing_state.to(validate_state)
-    run_route_to_visual = routing_state.to(visual_state)
+    event_route_to_train = routing_state.to(train_state)
+    event_route_to_validate = routing_state.to(validate_state)
+    event_route_to_visual = routing_state.to(visual_state)
 
     # Train 与 Validate 的双向流转
-    run_train_to_validate = train_state.to(validate_state)
-    run_validate_to_train = validate_state.to(train_state)
+    event_train_to_validate = train_state.to(validate_state)
+    event_validate_to_train = validate_state.to(train_state)
 
     # 指向结束
-    run_train_to_end = train_state.to(end_state)
-    run_validate_to_end = validate_state.to(end_state)
-    run_visual_to_end = visual_state.to(end_state)
+    event_train_to_end = train_state.to(end_state)
+    event_validate_to_end = validate_state.to(end_state)
+    event_visual_to_end = visual_state.to(end_state)
 
     def __init__(self,
                  model: OwlModel,
@@ -102,54 +102,56 @@ class OwlEngine(StateMachine):
         self.current_step = 0
         self.device = torch.device(device)
 
-        # Start -> 路由分支
-        self.run_route()
+        # Start -> routing_state
+        self.event_start_to_routing()
 
         if mode == ExecMode.TRAIN:
-            self.run_route_to_train()
+            self.event_route_to_train()
         elif mode == ExecMode.VALIDATE:
-            self.run_route_to_validate()
+            self.event_route_to_validate()
         elif mode == ExecMode.VISUALIZE:
-            self.run_route_to_visual()
+            self.event_route_to_visual()
 
         # 无限循环状态机驱动
         while not self.end_state.is_active:
 
             # 处于 TRAIN 节点
             if self.train_state.is_active:
-                # 执行一个 Epoch 的训练
+                """
+                执行一轮训练，直接进入 validate_state
+                """
                 self._do_train_epoch()
-
-                # epoch 结束，同时 val_loaders 不为 None
-                if self.val_loaders:
-                    self.run_train_to_validate()  # 箭头：如果 validate 存在 -> validate
-                else:
-                    self.current_epoch += 1
-                    if self.current_epoch >= self.max_epochs:
-                        self.run_train_to_end()  # 箭头：-> 结束
+                self.event_train_to_validate()
 
             # 处于 VALIDATE 节点
             elif self.validate_state.is_active:
+                """
+                 执行 validate
+                 if 当前模式 == TRAIN:
+                    epoch++
+                    if epoch < self.max_epochs:
+                        进入 train_state
+                 else:
+                    进入 end_state
+                """
                 self._do_validate()
 
-                # 1、当前模式是 train -> train node
-                # 2、当前模式不是train -> end node
                 if self.current_mode == ExecMode.TRAIN:
                     self.current_epoch += 1
                     # 如果当前是 train 模式, 同时 epoch 没有结束
                     if self.current_epoch < self.max_epochs:
-                        self.run_validate_to_train()
+                        self.event_validate_to_train()
                     else:
-                        self.run_validate_to_end()  # 箭头：-> 结束 (达到最大轮次)
+                        self.event_validate_to_end()
                 else:
-                    self.run_validate_to_end()  # 纯 validate 模式跑完直接 -> 结束
+                    self.event_validate_to_end()
 
             # 处于 VISUAL 节点
             elif self.visual_state.is_active:
-                self._do_visualize()  # 执行可视化逻辑
-                self.run_visual_to_end()  # 箭头：-> 结束
+                self._do_visualize()
+                self.event_visual_to_end()
 
-    def on_run_route_to_train(self):
+    def on_event_route_to_train(self):
         """初始化 pipeline
         :return:
         """

@@ -28,31 +28,31 @@ class OwlApp(StateMachine):
     # ==========================================
     # AppState
     # ==========================================
-    empty = State(AppState.EMPTY.value, initial=True)  # 空状态
-    instantiated = State(AppState.INSTANTIATED.value)            # 实例化组件
-    mounted = State(AppState.MOUNTED.value)              # 初始化权重，device 之类
-    running = State(AppState.RUNNING.value)            # 进入运行
-    finished = State(AppState.FINISHED.value)          # 运行结束
-    error = State(AppState.ERROR.value)                # 错误
+    empty_state = State(AppState.EMPTY.value, initial=True)    # 空状态
+    instantiated_state = State(AppState.INSTANTIATED.value)    # 实例化组件
+    mounted_state = State(AppState.MOUNTED.value)              # 初始化权重，device 之类
+    running_state = State(AppState.RUNNING.value)              # 进入运行
+    finished_state = State(AppState.FINISHED.value)            # 运行结束
+    error_state = State(AppState.ERROR.value)                  # 错误
 
     # ========================================================================
     # 状态转移图
     #
-    # +---------+      +--------------+      +---------+      +---------+      +----------+
-    # |  empty  |----->| instantiated |----->| mounted |----->| running |----->| finished |
-    # +---------+      +--------------+      +---------+      +---------+      +----------+
-    #      |                |                   |                 |
-    #      | run_fail       | run_fail          | run_fail        | run_fail
-    #      v                v                   v                 v
-    # +-----------------------------------------------------------------------------+
-    # |                                   error                                     |
-    # +-----------------------------------------------------------------------------+
+    # +-------------+      +--------------------+      +---------------+      +---------------+      +----------------+
+    # | empty_state |----->| instantiated_state |----->| mounted_state |----->| running_state |----->| finished_state |
+    # +-------------+      +--------------------+      +---------------+      +---------------+      +----------------+
+    #      |                        |                         |                       |
+    #      | event_fail             | event_fail              | event_fail            | event_fail
+    #      v                        v                         v                       v
+    # +---------------------------------------------------------------------------------------------------------------+
+    # |                                                  error_state                                                  |
+    # +---------------------------------------------------------------------------------------------------------------+
     # ========================================================================
-    run_instantiate = empty.to(instantiated)
-    run_mount = instantiated.to(mounted)
-    run_start = mounted.to(running)
-    run_complete = running.to(finished)
-    run_fail = (empty.to(error) | instantiated.to(error) | mounted.to(error) | running.to(error))
+    event_instantiate = empty_state.to(instantiated_state)
+    event_mount = instantiated_state.to(mounted_state)
+    event_start = mounted_state.to(running_state)
+    event_complete = running_state.to(finished_state)
+    event_fail = (empty_state.to(error_state) | instantiated_state.to(error_state) | mounted_state.to(error_state) | running_state.to(error_state))
 
     def __init__(self):
         # --- 存放实例化的组件 ---
@@ -73,7 +73,7 @@ class OwlApp(StateMachine):
 
         super().__init__()
 
-    def on_run_instantiate(self,
+    def on_event_instantiate(self,
                      max_epochs: int,
                      model_name: str, model_cfg: Dict[str, Any],
                      criterion_name: str, criterion_cfg: Dict[str, Any],
@@ -127,7 +127,7 @@ class OwlApp(StateMachine):
         if visualizer_name:
             self.visualizer = VISUALIZERS.build(visualizer_name, **(visualizer_cfg or {}))
 
-    def on_run_mount(self, mode: ExecMode, checkpoint_path: str | pathlib.Path, device: str|torch.device):
+    def on_event_mount(self, mode: ExecMode, checkpoint_path: str | pathlib.Path, device: str|torch.device):
         """Instantiated -> Mounted：加载 checkpoint 和移动 device
 
         加载权重和移动 device
@@ -149,7 +149,7 @@ class OwlApp(StateMachine):
                     self.scheduler.load_state_dict(ckpt["scheduler_state"])
                 self.start_epoch = ckpt.get("epoch", -1) + 1
 
-    def on_run_start(self, mode: ExecMode, max_epochs: int):
+    def on_event_start(self, mode: ExecMode, max_epochs: int):
         """Mounted -> Running： 运行期
 
         开始运行
@@ -204,8 +204,7 @@ class OwlApp(StateMachine):
                visualizer_name: str | None = None,
                visualizer_cfg: Dict[str, Any] | None = None):
         """
-        该方法会自动按照状态机的定义，依次触发组件实例化 (instantiated)、硬件分配与权重加载 (instantiated)、
-        启动第二层任务 (start)，并最终收尾完成任务 (complete)。。
+        该方法会自动按照状态机的定义，依次触发组件实例化 (instantiated_state)、硬件分配与权重加载 (mounted_state)、启动第二层任务 (running_state)，并最终收尾完成任务 (finished_state)
 
         Args:
             mode (ExecMode):任务执行模式，可选 `TRAIN`, `VALIDATE`, `VISUALIZE`。
@@ -250,7 +249,7 @@ class OwlApp(StateMachine):
 
         try:
             # empty -> instantiated：实例化组件
-            self.run_instantiate(
+            self.event_instantiate(
                 max_epochs=max_epochs,
                 model_name=model_name,             model_cfg=model_cfg,
                 criterion_name=criterion_name,     criterion_cfg=criterion_cfg,
@@ -261,14 +260,14 @@ class OwlApp(StateMachine):
             )
 
             # instantiated -> mounted： 加载权重、移动 device 之类的
-            self.run_mount(mode=mode, checkpoint_path=checkpoint_path, device=device)
+            self.event_mount(mode=mode, checkpoint_path=checkpoint_path, device=device)
 
             # mounted -> RUNNING： 开始运行
-            self.run_start(mode=mode, max_epochs=max_epochs)
+            self.event_start(mode=mode, max_epochs=max_epochs)
 
             # RUNNING -> FINISHED： 结束
-            self.run_complete()
+            self.event_complete()
 
         except Exception as e:
-            self.run_fail()
+            self.event_fail()
             raise e

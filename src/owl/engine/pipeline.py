@@ -17,37 +17,37 @@ class StepPipeline(StateMachine):
     # ==========================================
     # 定义状态
     # ==========================================
-    started = State(StepState.STARTED.value, initial=True)
-    grad_zeroed = State(StepState.GRAD_ZEROED.value)
-    forward_computed = State(StepState.FORWARD_COMPUTED.value)
-    loss_computed = State(StepState.LOSS_COMPUTED.value)
-    backward_computed = State(StepState.BACKWARD_COMPUTED.value)
-    optimized = State(StepState.OPTIMIZED.value)
-    scheduled = State(StepState.SCHEDULED.value)
-    ended = State(StepState.ENDED.value)
+    started_state = State(StepState.STARTED.value, initial=True)
+    grad_zeroed_state = State(StepState.GRAD_ZEROED.value)
+    forward_computed_state = State(StepState.FORWARD_COMPUTED.value)
+    loss_computed_state = State(StepState.LOSS_COMPUTED.value)
+    backward_computed_state = State(StepState.BACKWARD_COMPUTED.value)
+    optimized_state = State(StepState.OPTIMIZED.value)
+    scheduled_state = State(StepState.SCHEDULED.value)
+    ended_state = State(StepState.ENDED.value)
 
     # ========================================================================
     # 状态转移图
     #
-    # +---------+   +-------------+   +------------------+   +---------------+
-    # | started |-->| grad_zeroed |-->| forward_computed |-->| loss_computed |
-    # +---------+   +-------------+   +------------------+   +---------------+
-    #      ^                                                         |
-    #      |      +-------+   +-----------+   +-------------------+  |
-    #      \------| ended |<--| scheduled |<--| backward_computed |<-/
-    #             +-------+   +-----------+   +-------------------+
+    # +---------------+   +-------------------+   +------------------------+   +---------------------+
+    # | started_state |-->| grad_zeroed_state |-->| forward_computed_state |-->| loss_computed_state |
+    # +---------------+   +-------------------+   +------------------------+   +---------------------+
+    #         ^                                                                           |
+    #         |         +-------------+   +-----------------+   +-------------------------+
+    #         \---------| ended_state |<--| scheduled_state |<--| backward_computed_state |
+    #                   +-------------+   +-----------------+   +-------------------------+
     #
     # ========================================================================
-    run_zero_grad = started.to(grad_zeroed)
-    run_forward = grad_zeroed.to(forward_computed)
-    run_compute_loss = forward_computed.to(loss_computed)
-    run_backward = loss_computed.to(backward_computed)
-    run_optimize = backward_computed.to(optimized)
-    run_schedule = optimized.to(scheduled)
-    run_finish = scheduled.to(ended)
+    event_zero_grad = started_state.to(grad_zeroed_state)
+    event_forward = grad_zeroed_state.to(forward_computed_state)
+    event_compute_loss = forward_computed_state.to(loss_computed_state)
+    event_backward = loss_computed_state.to(backward_computed_state)
+    event_optimize = backward_computed_state.to(optimized_state)
+    event_schedule = optimized_state.to(scheduled_state)
+    event_finish = scheduled_state.to(ended_state)
 
     # 重置
-    reset_pipeline = ended.to(started)
+    event_reset_pipeline = ended_state.to(started_state)
 
     def __init__(self, model: OwlModel,
                  criterion: OwlCriterion,
@@ -75,11 +75,11 @@ class StepPipeline(StateMachine):
     # action hook
     # ==========================================
 
-    def on_run_zero_grad(self):
+    def on_event_zero_grad(self):
         """清空梯度"""
         self.optimizer.zero_grad()
 
-    def on_run_forward(self):
+    def on_event_forward(self):
         """前向传播"""
         self.ctx_outputs = self.model(
             batch_data=self.ctx_batch,
@@ -87,7 +87,7 @@ class StepPipeline(StateMachine):
             current_step=self.ctx_step
         )
 
-    def on_run_compute_loss(self):
+    def on_event_compute_loss(self):
         """计算损失"""
         self.ctx_loss = self.criterion(
             model_outputs=self.ctx_outputs,
@@ -96,20 +96,20 @@ class StepPipeline(StateMachine):
             current_step=self.ctx_step
         )
 
-    def on_run_backward(self):
+    def on_event_backward(self):
         """反向传播"""
         self.ctx_loss.backward()
 
-    def on_run_optimize(self):
+    def on_event_optimize(self):
         """更新梯度"""
         self.optimizer.step()
 
-    def on_run_schedule(self):
+    def on_event_schedule(self):
         """学习率调整"""
         if self.scheduler is not None:
             self.scheduler.step()
 
-    def on_run_finish(self):
+    def on_event_finish(self):
         """"""
         pass
 
@@ -121,8 +121,8 @@ class StepPipeline(StateMachine):
             current_epoch (int): 当前所属轮次。
             current_step (int): 当前所属全局batch数。
         """
-        if self.ended.is_active:
-            self.reset_pipeline()
+        if self.ended_state.is_active:
+            self.event_reset_pipeline()
 
         self.ctx_epoch = current_epoch
         self.ctx_step = current_step
@@ -131,13 +131,13 @@ class StepPipeline(StateMachine):
         batch_data['gt_tensors'] = batch_data['gt_tensors'].to(self.device, non_blocking=self.non_blocking)
         self.ctx_batch = batch_data
 
-        self.run_zero_grad()
-        self.run_forward()
-        self.run_compute_loss()
-        self.run_backward()
-        self.run_optimize()
-        self.run_schedule()
-        self.run_finish()
+        self.event_zero_grad()
+        self.event_forward()
+        self.event_compute_loss()
+        self.event_backward()
+        self.event_optimize()
+        self.event_schedule()
+        self.event_finish()
 
         return {
             "loss": self.ctx_loss.item() if self.ctx_loss is not None else 0.0,
