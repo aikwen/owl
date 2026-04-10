@@ -1,19 +1,22 @@
 import pathlib
-from typing import Any, Dict, Optional
+from typing import Any
+
 import torch
 from torch.utils.data import DataLoader
 from statemachine import StateMachine, State
 
 from .state import AppState, ExecMode
 from .engine import OwlEngine
+from ..toolkits.evaluator import EVALUATORS
+from ..toolkits.evaluator.base import OwlEvaluator
 from ..toolkits.model import MODELS
 from ..toolkits.criterion import CRITERIA
 from ..toolkits.optimizer import OPTIMIZERS
 from ..toolkits.scheduler import SCHEDULERS
-from ..toolkits.visual import VISUALIZERS
+from ..toolkits.visualizer import VISUALIZERS
 from ..toolkits.model.base import OwlModel
 from ..toolkits.criterion.base import OwlCriterion
-from ..toolkits.visual.base import OwlVisualizer
+from ..toolkits.visualizer.base import OwlVisualizer
 from ..toolkits.data.dataloader import OwlDataLoader
 from ..toolkits.common import fs
 from ..toolkits.common.types import CheckpointDict
@@ -59,8 +62,9 @@ class OwlApp(StateMachine):
         self.model: OwlModel | None = None
         self.criterion: OwlCriterion | None = None
         self.optimizer: torch.optim.Optimizer | None = None
-        self.scheduler: Any | None = None
+        self.scheduler: Any | None  = None
         self.visualizer: OwlVisualizer | None = None
+        self.evaluator: OwlEvaluator | None = None
 
         self.train_loader: DataLoader | None = None
         self.val_loaders: dict[str, DataLoader] | None = {}
@@ -75,20 +79,21 @@ class OwlApp(StateMachine):
 
     def on_event_instantiate(self,
                      max_epochs: int,
-                     model_name: str, model_cfg: Dict[str, Any],
-                     criterion_name: str, criterion_cfg: Dict[str, Any],
-                     optimizer_name: str, optimizer_cfg: Dict[str, Any],
-                     owl_train_loader: OwlDataLoader | None = None,
-                     owl_val_loaders: OwlDataLoader | None = None,
-                     scheduler_name: str | None = None, scheduler_cfg: Dict[str, Any]| None = None,
-                     visualizer_name: str | None = None, visualizer_cfg: Dict[str, Any]|None = None,
+                     model_name: str, model_cfg: dict[str, Any],
+                     criterion_name: str, criterion_cfg: dict[str, Any],
+                     optimizer_name: str, optimizer_cfg: dict[str, Any],
+                     owl_train_loader: OwlDataLoader | None,
+                     owl_val_loaders: OwlDataLoader | None,
+                     scheduler_name: str | None, scheduler_cfg: dict[str, Any]| None ,
+                     visualizer_name: str | None, visualizer_cfg: dict[str, Any]|None,
+                    evaluator_name: str | None, evaluator_cfg: dict[str, Any] | None,
                      ):
         """Empty -> Instantiated：只用来实例化组件
         """
         self.model = MODELS.build(model_name, **model_cfg)
         self.criterion = CRITERIA.build(criterion_name, **criterion_cfg)
 
-        """实例化 optimizer
+        """实例化 optimizer, 自动注入model
          @OPTIMIZERS.register(name="adamw")
          def adamw(model: nn.Module, lr: float, weight_decay: float) -> optim.Optimizer:
             return optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -103,7 +108,7 @@ class OwlApp(StateMachine):
         self.train_loader = owl_train_loader.get_train_loader() if owl_train_loader else None
         self.val_loaders = owl_val_loaders.get_valid_loaders() if owl_val_loaders else {}
 
-        """实例化 scheduler
+        """实例化 scheduler， 自动注入optimizer，epochs，batches
         @SCHEDULERS.register(name="poly")
         def poly(optimizer: optim.Optimizer, power: float, epochs: int, batches: int) -> optim.lr_scheduler.LRScheduler:
             total_iters = epochs * batches
@@ -113,7 +118,6 @@ class OwlApp(StateMachine):
                 power=power
             )
         """
-        #
         if scheduler_name:
             injected_kwargs = {
                 "optimizer": self.optimizer,
@@ -124,10 +128,16 @@ class OwlApp(StateMachine):
             scheduler_cfg = scheduler_cfg or {}
             scheduler_cfg.update(injected_kwargs)
             self.scheduler = SCHEDULERS.build(scheduler_name, **scheduler_cfg)
+
         if visualizer_name:
             self.visualizer = VISUALIZERS.build(visualizer_name, **(visualizer_cfg or {}))
 
-    def on_event_mount(self, mode: ExecMode, checkpoint_path: str | pathlib.Path, device: str|torch.device):
+        if evaluator_name:
+            self.evaluator = EVALUATORS.build(evaluator_name, **(evaluator_cfg or {}))
+
+    def on_event_mount(self, mode: ExecMode,
+                       checkpoint_path: str | pathlib.Path,
+                       device: str|torch.device):
         """Instantiated -> Mounted：加载 checkpoint 和移动 device
 
         加载权重和移动 device
@@ -143,7 +153,7 @@ class OwlApp(StateMachine):
             self.model.load_state_dict(ckpt["model_state"])
 
             if mode == ExecMode.TRAIN:
-                if "optimizer_state" in ckpt:
+                if self.optimizer and "optimizer_state" in ckpt:
                     self.optimizer.load_state_dict(ckpt["optimizer_state"])
                 if self.scheduler and "scheduler_state" in ckpt:
                     self.scheduler.load_state_dict(ckpt["scheduler_state"])
@@ -165,7 +175,8 @@ class OwlApp(StateMachine):
             scheduler=self.scheduler,
             train_loader=self.train_loader,
             val_loaders=self.val_loaders,
-            visualizer=self.visualizer
+            visualizer=self.visualizer,
+            evaluator = self.evaluator,
         )
 
         self.engine.run(
@@ -176,33 +187,38 @@ class OwlApp(StateMachine):
         )
 
     def launch(self,
-               # ==========================================
-               # 运行控制参数
-               # ==========================================
+               # 运行模式
                mode: ExecMode,
-               max_epochs: int = 1,
-               checkpoint_path: str = "",
-               device: str = "cpu",
-
-               # ==========================================
-               # 核心组件参数
-               # ==========================================
-               model_name: str = "",
-               model_cfg: Dict[str, Any] = None,
+               # 模型名称
+               model_name: str,
+               # 损失函数
                criterion_name: str = "",
-               criterion_cfg: Dict[str, Any] = None,
+               # 优化器
                optimizer_name: str = "",
-               optimizer_cfg: Dict[str, Any] = None,
-
-               # ==========================================
-               # 数据与可选组件
-               # ==========================================
-               scheduler_name: str | None = None,
-               scheduler_cfg: Dict[str, Any] | None = None,
+               # 学习率优化器
+               scheduler_name: str = "",
+               # 数据集
                owl_train_loader: OwlDataLoader | None = None,
                owl_val_loaders: OwlDataLoader | None = None,
+               # 训练轮次
+               max_epochs: int = 1,
+               # 预先加载的权重
+               checkpoint_path: str = "",
+               # device 设备
+               device: str | torch.device = "cuda" if torch.cuda.is_available() else "cpu",
+               # 相关配置
+               model_cfg: dict[str, Any] | None = None,
+               criterion_cfg: dict[str, Any] | None = None,
+               optimizer_cfg: dict[str, Any] | None = None,
+               scheduler_cfg: dict[str, Any] | None = None,
+
+               # 可视化模式
                visualizer_name: str | None = None,
-               visualizer_cfg: Dict[str, Any] | None = None):
+               visualizer_cfg: dict[str, Any] | None = None,
+               # 评估模式
+               evaluator_name: str | None = None,
+               evaluator_cfg: dict[str, Any] | None = None,
+               ):
         """
         该方法会自动按照状态机的定义，依次触发组件实例化 (instantiated_state)、硬件分配与权重加载 (mounted_state)、启动第二层任务 (running_state)，并最终收尾完成任务 (finished_state)
 
@@ -212,15 +228,17 @@ class OwlApp(StateMachine):
             checkpoint_path (str, optional): 断点续训或预训练权重的文件路径（如 '.pth'） 若为空字符串，则模型使用随机初始化权重。默认为 ""。
             device (str, optional): 目标物理设备，例如 "cuda", "cuda:0" 或 "cpu"。默认为 "cpu"。
             model_name (str, optional): 注册在 MODELS 中的模型名称。默认为 ""。
-            model_cfg (Dict[str, Any], optional): 传递给模型构造函数的配置字典。默认为 None。
+            model_cfg (dict[str, Any], optional): 传递给模型构造函数的配置字典。默认为 None。
             criterion_name (str, optional): 注册在 CRITERIA 中的损失函数名称。默认为 ""。
-            criterion_cfg (Dict[str, Any], optional): 传递给损失函数构造函数的配置字典。默认为 None。
+            criterion_cfg (dict[str, Any], optional): 传递给损失函数构造函数的配置字典。默认为 None。
             optimizer_name (str, optional): 注册在 OPTIMIZERS 中的优化器名称。默认为 ""。
-            optimizer_cfg (Dict[str, Any], optional): 传递给优化器构造函数的配置字典。默认为 None。
+            optimizer_cfg (dict[str, Any], optional): 传递给优化器构造函数的配置字典。默认为 None。
             scheduler_name (str | None, optional): 注册在 SCHEDULERS 中的学习率调度器名称。默认为 None。
-            scheduler_cfg (Dict[str, Any] | None, optional): 学习率调度器配置字典。默认为 None。
+            scheduler_cfg (dict[str, Any] | None, optional): 学习率调度器配置字典。默认为 None。
             visualizer_name (str | None, optional): 注册在 VISUALIZERS 中的可视化器名称。默认为 None。
-            visualizer_cfg (Dict[str, Any] | None, optional): 可视化器配置字典。默认为 None。
+            visualizer_cfg (dict[str, Any] | None, optional): 可视化器配置字典。默认为 None。
+            evaluator_name (str | None): 注册的评估器名称。
+            evaluator_cfg (dict[str, Any] | None): 评估器配置。
             owl_train_loader (OwlDataLoader | None, optional): 封装了训练集的加载器对象。默认为 None。
             owl_val_loaders (OwlDataLoader | None, optional): 封装了验证集的加载器对象。默认为 None。
 
@@ -238,14 +256,14 @@ class OwlApp(StateMachine):
             ...     model_cfg={"in_channels": 3},
             ...     optimizer_name="AdamW",
             ...     optimizer_cfg={"lr": 1e-3, "weight_decay": 1e-2},
+            ...     scheduler_name="poly",
+            ...     scheduler_cfg={"power": 0.9},
+            ...     evaluator_name="default_auc_f1",
+            ...     evaluator_cfg={"threshold": 0.5},
             ...     owl_train_loader=train_data_loader,
             ...     owl_val_loaders=val_data_loader
             ... )
         """
-
-        model_cfg = model_cfg or {}
-        criterion_cfg = criterion_cfg or {}
-        optimizer_cfg = optimizer_cfg or {}
 
         try:
             # empty -> instantiated：实例化组件
@@ -256,10 +274,11 @@ class OwlApp(StateMachine):
                 optimizer_name=optimizer_name,     optimizer_cfg=optimizer_cfg,
                 scheduler_name=scheduler_name,     scheduler_cfg=scheduler_cfg,
                 visualizer_name=visualizer_name,   visualizer_cfg=visualizer_cfg,
+                evaluator_name=evaluator_name, evaluator_cfg=evaluator_cfg,
                 owl_train_loader=owl_train_loader, owl_val_loaders=owl_val_loaders,
             )
 
-            # instantiated -> mounted： 加载权重、移动 device 之类的
+            # instantiated -> mounted： 加载权重、移动 device...
             self.event_mount(mode=mode, checkpoint_path=checkpoint_path, device=device)
 
             # mounted -> RUNNING： 开始运行
@@ -271,3 +290,77 @@ class OwlApp(StateMachine):
         except Exception as e:
             self.event_fail()
             raise e
+
+    def before_event_instantiate(self, **kwargs):
+        """event_instantiate hook
+
+        对输入的参数进行检查和设置默认值
+        """
+        mode = kwargs.get("mode")
+        components = [
+            ("model_name", "model_cfg"),
+            ("criterion_name", "criterion_cfg"),
+            ("optimizer_name", "optimizer_cfg"),
+            ("scheduler_name", "scheduler_cfg"),
+            ("evaluator_name", "evaluator_cfg"),
+            ("visualizer_name", "visualizer_cfg"),
+        ]
+
+        for name_key, cfg_key in components:
+            name_val = kwargs.get(name_key)
+            cfg_val = kwargs.get(cfg_key)
+
+            # 如果传了名字没传配置，或者传了配置没写名字，直接报错
+            if (name_val and cfg_val is None) or (not name_val and cfg_val is not None):
+                raise ValueError(
+                    f"参数不匹配：'{name_key}' 和 '{cfg_key}' 必须成对提供，"
+                    f"或全不提供以使用默认值。当前状态: {name_key}={name_val}, {cfg_key}={cfg_val}"
+                )
+
+            # 类型校验
+            if name_val and not isinstance(name_val, str):
+                raise TypeError(f"类型错误：'{name_key}' 必须是 str 类型，当前为 {type(name_val).__name__}")
+            if cfg_val and not isinstance(cfg_val, dict):
+                raise TypeError(f"类型错误：'{cfg_key}' 必须是 dict 类型，当前为 {type(cfg_val).__name__}")
+
+        train_loader = kwargs.get("owl_train_loader")
+        val_loaders = kwargs.get("owl_val_loaders")
+
+        # 运行前检查
+        if mode == ExecMode.TRAIN:
+            # 检查数据集
+            if train_loader is None:
+                raise ValueError("参数错误: TRAIN 模式必须提供 'owl_train_loader'。")
+            # 检查损失函数
+            criterion_name = kwargs.get("criterion_name")
+            if not criterion_name or not criterion_name.strip():
+                raise ValueError(
+                    "参数错误: TRAIN 模式下必须显式指定 'criterion_name'，框架不提供默认损失函数。"
+                )
+        elif mode in (ExecMode.VALIDATE, ExecMode.VISUALIZE):
+            # 评估和可视化模式必须有验证数据集
+            if not val_loaders:
+                raise ValueError(f"参数错误: {mode.value} 模式下 'owl_val_loaders' 不能为空。")
+
+        # 设置默认值
+        if mode == ExecMode.TRAIN:
+            # 默认优化器注入
+            if not kwargs.get("optimizer_name"):
+                kwargs["optimizer_name"] = "adamw"
+                kwargs["optimizer_cfg"] = {"lr": 1e-3, "weight_decay": 1e-2}
+
+            # 默认学习率策略注入
+            if not kwargs.get("scheduler_name"):
+                kwargs["scheduler_name"] = "poly"
+                kwargs["scheduler_cfg"] = {"power": 0.9}
+
+        # 评估器注入，非可视化模式下默认开启
+        if not kwargs.get("evaluator_name") and mode != ExecMode.VISUALIZE:
+            kwargs["evaluator_name"] = "default_auc_f1"
+            kwargs["evaluator_cfg"] = {"threshold": 0.5}
+
+        for _, cfg_key in components:
+            if kwargs.get(cfg_key) is None:
+                kwargs[cfg_key] = {}
+
+        return kwargs

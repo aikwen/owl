@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Generic, TypeVar
+from typing import Callable, Generic, TypeVar
 
 # 定义一个泛型类型 T
 T = TypeVar('T')
@@ -12,7 +12,7 @@ class Registry(Generic[T]):
     def __init__(self, name: str):
         self._name = name
         # 存储名称到可调用对象（类或函数）的映射
-        self._obj_map: Dict[str, Callable[..., T]] = {}
+        self._obj_map: dict[str, Callable[..., T]] = {}
 
     def register(self, name: str|None = None) -> Callable[[Callable[..., T]], Callable[..., T]]:
         """装饰器：将类或构建函数注册到工厂中。

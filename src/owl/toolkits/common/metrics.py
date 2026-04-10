@@ -1,6 +1,6 @@
 import torch
 from dataclasses import dataclass
-from typing import List, Protocol
+from typing import Protocol
 import math
 
 @dataclass
@@ -250,7 +250,7 @@ def auc_single(gt_prob: torch.Tensor, predict_prob: torch.Tensor) -> float:
 
     return res.item()
 
-def auc_batch(gt_prob: torch.Tensor, predict_prob: torch.Tensor, auc_single_func:AUCSingleProtocol) -> List[float]:
+def auc_batch(gt_prob: torch.Tensor, predict_prob: torch.Tensor, auc_single_func:AUCSingleProtocol) -> list[float]:
     """批量计算一个批次（Batch）数据的图像级 AUC 分数。
 
     该函数会沿着第 0 维（Batch 维度）遍历数据。对于图像篡改定位任务，
@@ -263,7 +263,7 @@ def auc_batch(gt_prob: torch.Tensor, predict_prob: torch.Tensor, auc_single_func
         auc_single_func (AUCSingleProtocol): 用于计算单图 AUC 的函数或协议实现。
 
     Returns:
-        List[float]: 包含该批次所有有效 AUC 分数的列表。
+        list[float]: 包含该批次所有有效 AUC 分数的列表。
 
     Examples:
         >>> # 构造一个 batch_size=2 的已展平数据 [N, L]
@@ -282,7 +282,7 @@ def auc_batch(gt_prob: torch.Tensor, predict_prob: torch.Tensor, auc_single_func
         [1.0]
     """
     batch_size = gt_prob.shape[0]
-    res:List[float] = []
+    res:list[float] = []
     for i in range(batch_size):
         v = auc_single_func(gt_prob[i], predict_prob[i])
         if not math.isnan(v):

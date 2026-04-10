@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Union, Any, List
+from typing import Union
 
 
 def data_protocol(path: Union[str, Path]) -> Path:

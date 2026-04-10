@@ -42,7 +42,7 @@ def load_json(path: Union[str, pathlib.Path]) -> Any:
     Args:
         path: 文件路径
     Returns:
-        List or Dict: 解析后的 JSON 数据
+        list or dict: 解析后的 JSON 数据
     Raises:
         RuntimeError: 如果文件读取或解析失败
     """
