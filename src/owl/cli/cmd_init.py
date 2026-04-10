@@ -8,9 +8,9 @@ TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 def func(args):
     choices = [
         Choice(title="训练", value="train.py"),
-        Choice(title="验证", value="validate_metric.py"),
-        Choice(title="鲁棒性", value="validate_robust.py"),
-        Choice(title="可视化", value="visualization.py"),
+        Choice(title="验证", value="val_metric.py"),
+        Choice(title="鲁棒性", value="val_robust.py"),
+        Choice(title="可视化", value="visual.py"),
     ]
     selected_template = questionary.select(
         message="请选择一个要生成的模板 (上下键移动，回车确认):",

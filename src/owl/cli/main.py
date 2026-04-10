@@ -26,3 +26,13 @@ def main():
         name="version",
         help="查看版本号")
     parser_version.set_defaults(func=cmd_version.func)
+
+    # ==========================================
+    # 解析参数并执行对应的函数
+    # ==========================================
+    args = parser.parse_args()
+
+    if hasattr(args, 'func'):
+        args.func(args)
+    else:
+        parser.print_help()
