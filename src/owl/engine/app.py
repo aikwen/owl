@@ -4,7 +4,7 @@ from typing import Any
 import torch
 from torch.utils.data import DataLoader
 from statemachine import StateMachine, State
-
+from datetime import datetime
 from .state import AppState, ExecMode
 from .engine import OwlEngine
 from ..toolkits.evaluator import EVALUATORS
@@ -65,6 +65,7 @@ class OwlApp(StateMachine):
         self.scheduler: Any | None  = None
         self.visualizer: OwlVisualizer | None = None
         self.evaluator: OwlEvaluator | None = None
+        self.work_dir: pathlib.Path | None = None
 
         self.train_loader: DataLoader | None = None
         self.val_loaders: dict[str, DataLoader] | None = {}
@@ -76,64 +77,6 @@ class OwlApp(StateMachine):
         self.engine: OwlEngine | None = None
 
         super().__init__()
-
-    def on_event_instantiate(self,
-                     max_epochs: int,
-                     model_name: str, model_cfg: dict[str, Any],
-                     criterion_name: str, criterion_cfg: dict[str, Any],
-                     optimizer_name: str, optimizer_cfg: dict[str, Any],
-                     owl_train_loader: OwlDataLoader | None,
-                     owl_val_loaders: OwlDataLoader | None,
-                     scheduler_name: str | None, scheduler_cfg: dict[str, Any]| None ,
-                     visualizer_name: str | None, visualizer_cfg: dict[str, Any]|None,
-                    evaluator_name: str | None, evaluator_cfg: dict[str, Any] | None,
-                     ):
-        """Empty -> Instantiated：只用来实例化组件
-        """
-        self.model = MODELS.build(model_name, **model_cfg)
-        self.criterion = CRITERIA.build(criterion_name, **criterion_cfg)
-
-        """实例化 optimizer, 自动注入model
-         @OPTIMIZERS.register(name="adamw")
-         def adamw(model: nn.Module, lr: float, weight_decay: float) -> optim.Optimizer:
-            return optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-        """
-        if optimizer_name:
-            injected_kwargs = {
-                "model": self.model,
-            }
-            optimizer_cfg.update(injected_kwargs)
-            self.optimizer = OPTIMIZERS.build(optimizer_name, **optimizer_cfg)
-        # 数据加载器
-        self.train_loader = owl_train_loader.get_train_loader() if owl_train_loader else None
-        self.val_loaders = owl_val_loaders.get_valid_loaders() if owl_val_loaders else {}
-
-        """实例化 scheduler， 自动注入optimizer，epochs，batches
-        @SCHEDULERS.register(name="poly")
-        def poly(optimizer: optim.Optimizer, power: float, epochs: int, batches: int) -> optim.lr_scheduler.LRScheduler:
-            total_iters = epochs * batches
-            return optim.lr_scheduler.PolynomialLR(
-                optimizer=optimizer,
-                total_iters=total_iters,
-                power=power
-            )
-        """
-        if scheduler_name:
-            injected_kwargs = {
-                "optimizer": self.optimizer,
-                "epochs": max_epochs,
-                "batches": len(self.train_loader) if self.train_loader else 1
-            }
-
-            scheduler_cfg = scheduler_cfg or {}
-            scheduler_cfg.update(injected_kwargs)
-            self.scheduler = SCHEDULERS.build(scheduler_name, **scheduler_cfg)
-
-        if visualizer_name:
-            self.visualizer = VISUALIZERS.build(visualizer_name, **(visualizer_cfg or {}))
-
-        if evaluator_name:
-            self.evaluator = EVALUATORS.build(evaluator_name, **(evaluator_cfg or {}))
 
     def on_event_mount(self, mode: ExecMode,
                        checkpoint_path: str | pathlib.Path,
@@ -148,6 +91,7 @@ class OwlApp(StateMachine):
         if self.criterion:
             self.criterion.to(self.device)
 
+        # 检查权重是否存在，存在的话就加载权重
         if str(checkpoint_path).strip():
             ckpt: CheckpointDict = fs.load_checkpoint(checkpoint_path, device=self.device)
             self.model.load_state_dict(ckpt["model_state"])
@@ -177,6 +121,7 @@ class OwlApp(StateMachine):
             val_loaders=self.val_loaders,
             visualizer=self.visualizer,
             evaluator = self.evaluator,
+            work_dir=self.work_dir,
         )
 
         self.engine.run(
@@ -268,13 +213,14 @@ class OwlApp(StateMachine):
         try:
             # empty -> instantiated：实例化组件
             self.event_instantiate(
+                work_dir="",
                 max_epochs=max_epochs,
                 model_name=model_name,             model_cfg=model_cfg,
                 criterion_name=criterion_name,     criterion_cfg=criterion_cfg,
                 optimizer_name=optimizer_name,     optimizer_cfg=optimizer_cfg,
                 scheduler_name=scheduler_name,     scheduler_cfg=scheduler_cfg,
                 visualizer_name=visualizer_name,   visualizer_cfg=visualizer_cfg,
-                evaluator_name=evaluator_name, evaluator_cfg=evaluator_cfg,
+                evaluator_name=evaluator_name,     evaluator_cfg=evaluator_cfg,
                 owl_train_loader=owl_train_loader, owl_val_loaders=owl_val_loaders,
             )
 
@@ -343,6 +289,11 @@ class OwlApp(StateMachine):
                 raise ValueError(f"参数错误: {mode.value} 模式下 'owl_val_loaders' 不能为空。")
 
         # 设置默认值
+        # 默认日志目录
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        current_work_dir = pathlib.Path(f"./{timestamp}")
+        kwargs["work_dir"] = current_work_dir
+
         if mode == ExecMode.TRAIN:
             # 默认优化器注入
             if not kwargs.get("optimizer_name"):
@@ -360,15 +311,92 @@ class OwlApp(StateMachine):
             kwargs["evaluator_cfg"] = {"threshold": 0.5}
 
         # visualizer 默认值
-        if not kwargs.get("visualizer_name") and mode == ExecMode.VISUALIZE:
-            kwargs["visualizer_name"] = "default_mask"
-            kwargs["visualizer_cfg"] = {
-                "save_dir": "./work_dirs/vis_results",
-                "threshold": None
-            }
+        if mode == ExecMode.VISUALIZE:
+            if not kwargs.get("visualizer_name"):
+                kwargs["visualizer_name"] = "default_mask"
+
+        if kwargs.get("visualizer_name"):
+            v_cfg = kwargs.get("visualizer_cfg") or {}
+
+            user_save_dir = v_cfg.get("save_dir")
+            if not user_save_dir:
+                # 用户没传，使用默认的 `工作区/visual`
+                v_cfg["save_dir"] = str(current_work_dir.joinpath("visual"))
+            else:
+                user_path = pathlib.Path(user_save_dir)
+                if not user_path.is_absolute():
+                    # 用户传了相对路径 (如 "custom_vis")，强行锚定到当前工作区
+                    v_cfg["save_dir"] = str(current_work_dir.joinpath(user_path))
+                # 用户传了绝对路径 (如 "/mnt/data/vis")，原样保留；
+
+            # 如果用户没传阈值，给个默认 None
+            if "threshold" not in v_cfg and mode == ExecMode.VISUALIZE:
+                v_cfg["threshold"] = None
+
+            kwargs["visualizer_cfg"] = v_cfg
 
         for _, cfg_key in components:
             if kwargs.get(cfg_key) is None:
                 kwargs[cfg_key] = {}
 
         return kwargs
+
+    def on_event_instantiate(self,
+                     work_dir: pathlib.Path,
+                     max_epochs: int,
+                     model_name: str, model_cfg: dict[str, Any],
+                     criterion_name: str, criterion_cfg: dict[str, Any],
+                     optimizer_name: str, optimizer_cfg: dict[str, Any],
+                     owl_train_loader: OwlDataLoader | None,
+                     owl_val_loaders: OwlDataLoader | None,
+                     scheduler_name: str | None, scheduler_cfg: dict[str, Any]| None ,
+                     visualizer_name: str | None, visualizer_cfg: dict[str, Any]|None,
+                     evaluator_name: str | None, evaluator_cfg: dict[str, Any] | None,
+                     ):
+        """Empty -> Instantiated：只用来实例化组件
+        """
+        self.work_dir = work_dir
+        self.model = MODELS.build(model_name, **model_cfg)
+        self.criterion = CRITERIA.build(criterion_name, **criterion_cfg)
+
+        """实例化 optimizer, 自动注入model
+         @OPTIMIZERS.register(name="adamw")
+         def adamw(model: nn.Module, lr: float, weight_decay: float) -> optim.Optimizer:
+            return optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+        """
+        if optimizer_name:
+            injected_kwargs = {
+                "model": self.model,
+            }
+            optimizer_cfg.update(injected_kwargs)
+            self.optimizer = OPTIMIZERS.build(optimizer_name, **optimizer_cfg)
+        # 数据加载器
+        self.train_loader = owl_train_loader.get_train_loader() if owl_train_loader else None
+        self.val_loaders = owl_val_loaders.get_valid_loaders() if owl_val_loaders else {}
+
+        """实例化 scheduler， 自动注入optimizer，epochs，batches
+        @SCHEDULERS.register(name="poly")
+        def poly(optimizer: optim.Optimizer, power: float, epochs: int, batches: int) -> optim.lr_scheduler.LRScheduler:
+            total_iters = epochs * batches
+            return optim.lr_scheduler.PolynomialLR(
+                optimizer=optimizer,
+                total_iters=total_iters,
+                power=power
+            )
+        """
+        if scheduler_name:
+            injected_kwargs = {
+                "optimizer": self.optimizer,
+                "epochs": max_epochs,
+                "batches": len(self.train_loader) if self.train_loader else 1
+            }
+
+            scheduler_cfg = scheduler_cfg or {}
+            scheduler_cfg.update(injected_kwargs)
+            self.scheduler = SCHEDULERS.build(scheduler_name, **scheduler_cfg)
+
+        if visualizer_name:
+            self.visualizer = VISUALIZERS.build(visualizer_name, **(visualizer_cfg or {}))
+
+        if evaluator_name:
+            self.evaluator = EVALUATORS.build(evaluator_name, **(evaluator_cfg or {}))
