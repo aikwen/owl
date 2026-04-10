@@ -12,7 +12,7 @@ class OwlVisualizer(ABC):
     具体的渲染和落盘逻辑由子类的 __call__ 方法实现。
     """
 
-    def __init__(self, save_dir: str , threshold: float | None = 0.5):
+    def __init__(self, save_dir: str | pathlib.Path, threshold: float | None = 0.5):
         """
         Args:
             save_dir (str): 可视化结果保存的基础目录。
