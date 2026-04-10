@@ -354,10 +354,18 @@ class OwlApp(StateMachine):
                 kwargs["scheduler_name"] = "poly"
                 kwargs["scheduler_cfg"] = {"power": 0.9}
 
-        # 评估器注入，非可视化模式下默认开启
+        # 评估器默认值，非可视化模式下默认开启
         if not kwargs.get("evaluator_name") and mode != ExecMode.VISUALIZE:
             kwargs["evaluator_name"] = "default_auc_f1"
             kwargs["evaluator_cfg"] = {"threshold": 0.5}
+
+        # visualizer 默认值
+        if not kwargs.get("visualizer_name") and mode == ExecMode.VISUALIZE:
+            kwargs["visualizer_name"] = "default_mask"
+            kwargs["visualizer_cfg"] = {
+                "save_dir": "./work_dirs/vis_results",
+                "threshold": None
+            }
 
         for _, cfg_key in components:
             if kwargs.get(cfg_key) is None:
