@@ -85,13 +85,15 @@ def main():
     # 启动 Owl Engine
     # ==========================================
     app = OwlApp()
-
+    # 微调需要添加权重，同时设置finetune=true
+    p = ""
     app.launch(
         mode=ExecMode.TRAIN,  # 训练模式
         max_epochs=10,
-        ckpt_autosave=True,   # 自动保存
+        ckpt_autosave=False,   # 自动保存
+        checkpoint_path=p,
+        finetune=True,
         device="cuda" if torch.cuda.is_available() else "cpu",
-
         # 挂载组件
         model_name="dummy_model",
         model_cfg={"in_channels": 3},

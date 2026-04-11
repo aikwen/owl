@@ -8,8 +8,8 @@ TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 def func(args):
     choices = [
         Choice(title="训练", value="train.py"),
+        Choice(title="微调", value="finetune.py"),
         Choice(title="验证", value="val_metric.py"),
-        Choice(title="鲁棒性", value="val_robust.py"),
         Choice(title="可视化", value="visual.py"),
     ]
     selected_template = questionary.select(
