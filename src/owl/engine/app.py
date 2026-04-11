@@ -83,6 +83,7 @@ class OwlApp(StateMachine):
 
     def on_event_mount(self, mode: ExecMode,
                        checkpoint_path: str | pathlib.Path,
+                       finetune: bool,
                        device: str|torch.device):
         """Instantiated -> Mounted：加载 checkpoint 和移动 device
 
@@ -98,13 +99,18 @@ class OwlApp(StateMachine):
         if str(checkpoint_path).strip():
             ckpt: CheckpointDict = load_checkpoint(checkpoint_path, device=self.device)
             self.nn_model.load_state_dict(ckpt["model_state"])
+            from ..toolkits.common.logger import logger
+            logger.info(f"成功加载模型权重: {checkpoint_path}")
 
-            if mode == ExecMode.TRAIN:
+            if mode == ExecMode.TRAIN and not finetune:
                 if self.optimizer and "optimizer_state" in ckpt:
                     self.optimizer.load_state_dict(ckpt["optimizer_state"])
+                    logger.info(f"断点续训：加载恢复优化器状态")
                 if self.scheduler and "scheduler_state" in ckpt:
                     self.scheduler.load_state_dict(ckpt["scheduler_state"])
+                    logger.info(f"断点续训：加载恢复学习率优化器状态")
                 self.start_epoch = ckpt.get("epoch", -1) + 1
+                logger.info(f"断点续训：加载epoch，从 Epoch {self.start_epoch} 开始")
 
     def on_event_start(self, mode: ExecMode, max_epochs: int):
         """Mounted -> Running： 运行期
@@ -154,6 +160,8 @@ class OwlApp(StateMachine):
                max_epochs: int = 1,
                # 预先加载的权重
                checkpoint_path: str = "",
+               # 微调模式
+               finetune: bool=False,
                # device 设备
                device: str | torch.device = "cuda" if torch.cuda.is_available() else "cpu",
                # 相关配置
@@ -177,6 +185,7 @@ class OwlApp(StateMachine):
             ckpt_autosave (bool): 是否在每一轮自动保存权重
             max_epochs (int, optional): 最大运行轮次。当 mode 为 VALIDATE 或 VISUALIZE 时，内部会强制重置为 1。默认为 1。
             checkpoint_path (str, optional): 断点续训或预训练权重的文件路径（如 '.pth'） 若为空字符串，则模型使用随机初始化权重。默认为 ""。
+            finetune (bool): 微调模式，only model ckpt， 只会加载模型权重
             device (str, optional): 目标物理设备，例如 "cuda", "cuda:0" 或 "cpu"。默认为 "cpu"。
             model_name (str, optional): 注册在 MODELS 中的模型名称。默认为 ""。
             model_cfg (dict[str, Any], optional): 传递给模型构造函数的配置字典。默认为 None。
@@ -196,24 +205,6 @@ class OwlApp(StateMachine):
         Raises:
             Exception: 在装配、初始化或运行循环中抛出的任何底层运行时异常。捕获后状态机
                 将跳转至 ERROR 态，并将异常重新抛出。
-
-        Examples:
-            >>> app = OwlApp()
-            >>> app.launch(
-            ...     mode=ExecMode.TRAIN,
-            ...     max_epochs=30,
-            ...     device="cuda:0",
-            ...     model_name="MyModel",
-            ...     model_cfg={"in_channels": 3},
-            ...     optimizer_name="AdamW",
-            ...     optimizer_cfg={"lr": 1e-3, "weight_decay": 1e-2},
-            ...     scheduler_name="poly",
-            ...     scheduler_cfg={"power": 0.9},
-            ...     evaluator_name="default_auc_f1",
-            ...     evaluator_cfg={"threshold": 0.5},
-            ...     owl_train_loader=train_data_loader,
-            ...     owl_val_loaders=val_data_loader
-            ... )
         """
 
         try:
@@ -229,8 +220,17 @@ class OwlApp(StateMachine):
             self.event_mount(
                 mode=safe_kwargs["mode"],
                 checkpoint_path=safe_kwargs["checkpoint_path"],
+                finetune=safe_kwargs["finetune"],
                 device=safe_kwargs["device"]
             )
+
+            if safe_kwargs["mode"] == ExecMode.TRAIN and not safe_kwargs["finetune"]:
+                if self.start_epoch >= safe_kwargs["max_epochs"]:
+                    raise ValueError(
+                        f"\n[Error] 断点续训冲突：\n"
+                        f"当前权重已完成 {self.start_epoch} 轮，目标 'max_epochs' 为 {safe_kwargs['max_epochs']}。\n"
+                        f"若要继续训练，请使用 'finetune=True' 开启新的微调阶段。"
+                    )
 
             # mounted -> RUNNING： 开始运行
             self.event_start(
@@ -376,6 +376,7 @@ class OwlApp(StateMachine):
         OwlLogger.welcome()
 
         self.nn_model = MODELS.build(model_name, **model_cfg)
+        # 加载测试数据
         self.val_loaders = owl_val_loaders.get_valid_loaders() if owl_val_loaders else {}
         if mode == ExecMode.TRAIN:
             self.criterion = CRITERIA.build(criterion_name, **criterion_cfg)
@@ -422,10 +423,10 @@ class OwlApp(StateMachine):
                 raise ValueError(
                     "参数错误: VISUALIZE 模式下必须指定 'visualizer_name'，"
                 )
-        if mode == ExecMode.VALIDATE:
+        if mode in (ExecMode.TRAIN, ExecMode.VALIDATE):
             if evaluator_name:
                 self.evaluator = EVALUATORS.build(evaluator_name, **(evaluator_cfg or {}))
-            else:
+            elif mode == ExecMode.VALIDATE:
                 raise ValueError(
                     "参数错误: VALIDATE 模式下必须指定 'evaluator_name'"
                 )
