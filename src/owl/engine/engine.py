@@ -213,7 +213,7 @@ class OwlEngine(StateMachine):
             logger.bind(mode="train").opt(colors=True).info(f"权重已自动保存至: {save_path}")
 
     def _do_validate(self):
-        logger.bind(mode="val").opt(colors=True).info(f"--- 开始 Epoch [{self.current_epoch}] 验证 ---")
+        logger.bind(mode="val").opt(colors=True).info(f"--- 开始 Epoch [{self.current_epoch+1}] 验证 ---")
         epoch_metrics = {}
         self.nn_model.eval()
         with torch.no_grad():
@@ -237,7 +237,7 @@ class OwlEngine(StateMachine):
                     epoch_metrics[dataset_name] = self.evaluator.compute()
 
             if epoch_metrics:
-                table_str = format_metrics_table(epoch_metrics, current_epoch=self.current_epoch)
+                table_str = format_metrics_table(epoch_metrics, current_epoch=self.current_epoch+1)
                 if table_str:
                     logger.bind(mode="val").opt(colors=True).opt(raw=True).info(table_str)
 
