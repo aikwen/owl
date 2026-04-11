@@ -39,7 +39,7 @@ class OwlVisualizer(ABC):
         """执行可视化与保存操作
 
         Args:
-            batch_data (DataSetBatch): 当前批次的数据，包含 tp_names 等元数据。
+            batch_data (DataSetBatch): 当前批次的数据，包含 tp_name 等元数据。
             outputs (ModelOutput): 模型的标准输出包装器。
             dataset_name (str): 当前数据集名称，用于隔离保存目录。
         """

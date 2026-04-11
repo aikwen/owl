@@ -14,7 +14,7 @@ class OwlModel(nn.Module, ABC):
 
         Args:
             batch_data (types.DataSetBatch): 包含当前批次数据的字典，通常包含篡改图像
-                (tp_tensors) 及其对应的文件名等元信息。
+                (tp_tensor) 及其对应的文件名等元信息。
             current_epoch (int, optional): 当前所处的训练轮次 (Epoch)。 默认为 0。
             current_step (int, optional): 当前所处的全局batch (Step)。默认为 0。
             **kwargs: 保留字典，用于接收未来框架可能会下发的其他扩展上下文参数。
