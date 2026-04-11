@@ -1,40 +1,50 @@
-from io import StringIO
-from rich.table import Table
-from rich.console import Console
-from rich import box
+from prettytable import PrettyTable
 
 
 def format_metrics_table(all_metrics: dict[str, dict[str, float]], current_epoch: int) -> str:
-    """Format evaluation metrics into an ASCII table with center alignment."""
+    """使用 PrettyTable 生成纯 ASCII 指标表格，确保日志文件无乱码。"""
     if not all_metrics:
         return ""
 
-    table = Table(
-        box=box.SQUARE,
-        header_style="bold",
-        show_edge=True
-    )
+    table = PrettyTable()
 
-    # 1. 第一列（数据集名称）居中对齐
-    table.add_column("DATASET", justify="center", style="cyan", no_wrap=True)
-
+    # 获取指标名称 (例如: AUC, F1)
     first_ds = list(all_metrics.keys())[0]
     metric_keys = list(all_metrics[first_ds].keys())
-    for k in metric_keys:
-        # 2. 所有指标列（AUC, F1 等）也全部居中对齐
-        table.add_column(k.upper(), justify="center", style="green")
+
+    # 设置表头列名
+    table.field_names = ["DATASET"] + [k.upper() for k in metric_keys]
 
     for ds_name, metrics in all_metrics.items():
         row_values = [ds_name]
         for k in metric_keys:
             val = metrics.get(k, 0.0)
+            # 保持 4 位小数格式化
             row_values.append(f"{val:.4f}" if isinstance(val, float) else str(val))
-        table.add_row(*row_values)
+        table.add_row(row_values)
 
-    string_io = StringIO()
-    capture_console = Console(file=string_io, force_terminal=True)
+    table.align = "c"
 
-    capture_console.print(f"[bold yellow]Epoch [{current_epoch}] Summary [/bold yellow]")
-    capture_console.print(table)
+    lines = [
+        f"\nEpoch [{current_epoch}] Summary",
+        table.get_string(),
+        ""
+    ]
 
-    return f"\n{string_io.getvalue()}"
+    return "\n".join(lines) + "\n"
+
+def format_zero_pad(value: int, max_val: int) -> str:
+    """
+    对数字进行前导补 0 格式化。
+    对齐宽度由 max_val 的位数决定。
+
+    Args:
+        value (int): 当前值。
+        max_val (int): 允许达到的最大值, 用于确定宽度。
+
+    Returns:
+        str: 格式化后的字符串。例如：value=1, max_val=100 -> "001"
+    """
+    # 计算最大值的位数作为宽度
+    width = len(str(max_val))
+    return f"{value:0{width}d}"
