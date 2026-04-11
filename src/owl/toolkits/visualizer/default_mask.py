@@ -16,7 +16,7 @@ class DefaultMaskVisualizer(OwlVisualizer):
         pred_masks = self._process_logits(logits)
 
         # 从 DataSetBatch 中提取文件名列表
-        img_names = batch_data["tp_names"]
+        img_names = batch_data["tp_name"]
 
         # 当前数据集保存目录: save_dir / dataset_name
         current_save_dir = self.save_dir.joinpath(dataset_name)

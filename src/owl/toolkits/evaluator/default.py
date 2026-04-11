@@ -36,7 +36,7 @@ class DefaultEvaluator(OwlEvaluator):
         # 将 logits 并转为概率
         logits_tensor = outputs["logits"]
         predict_prob = torch.sigmoid(logits_tensor)
-        gt_prob = batch_data['gt_tensors']
+        gt_prob = batch_data['gt_tensor']
 
         # ==========================================
         # 计算图像级 AUC
