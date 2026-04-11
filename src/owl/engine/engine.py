@@ -13,6 +13,7 @@ from ..toolkits.visualizer.base import OwlVisualizer
 from ..toolkits.data.types import DataSetBatch
 from ..toolkits.common.logger import logger
 from ..toolkits.common.ckpt import CheckpointDict, save_checkpoint
+from ..toolkits.common.fmt import format_zero_pad, format_metrics_table
 
 class OwlEngine(StateMachine):
     """Owl level 2
@@ -74,7 +75,7 @@ class OwlEngine(StateMachine):
                  visualizer:   OwlVisualizer | None = None,):
 
         # 必要的组件
-        self.model: OwlModel = model
+        self.nn_model: OwlModel = model
         self.criterion:  OwlCriterion | None = criterion
         self.optimizer:  torch.optim.Optimizer | None = optimizer
         self.scheduler:  Any | None = scheduler
@@ -112,7 +113,7 @@ class OwlEngine(StateMachine):
         self.device = torch.device(device)
 
         # Start -> routing_state
-        logger.bind(mode="train").info(
+        logger.bind(mode="train").opt(colors=True).info(
             f"模式: <yellow>{mode.value.upper()}</yellow> | 设备: <yellow>{self.device}</yellow> | 目标 Epochs: <yellow>{self.max_epochs}</yellow>")
         self.event_start_to_routing()
 
@@ -167,7 +168,7 @@ class OwlEngine(StateMachine):
         :return:
         """
         self.train_pipeline = TrainStepPipeline(
-            model=self.model,
+            model=self.nn_model,
             criterion=self.criterion,
             optimizer=self.optimizer,
             scheduler=self.scheduler,
@@ -176,18 +177,24 @@ class OwlEngine(StateMachine):
         )
 
     def _do_train_epoch(self):
-        logger.bind(mode="train").info(f"--- 开始 Epoch [{self.current_epoch}/{self.max_epochs - 1}] 训练 ---")
-        self.model.train()
+        logger.bind(mode="train").opt(colors=True).info(f"--- 开始 Epoch [{self.current_epoch}/{self.max_epochs - 1}] 训练 ---")
+        self.nn_model.train()
         total_batches = len(self.train_loader)
+        # 日志打印频率
+        expected_logs_per_epoch = 3000
+        log_interval = max(1, total_batches // expected_logs_per_epoch)
+
         for batch_id, batch_data in enumerate(self.train_loader):
             batch_data: DataSetBatch
             self.current_step += 1
             res = self.train_pipeline.do_step_flow(batch_data, self.current_epoch, self.current_step)
-            if (batch_id + 1) % 10 == 0 or (batch_id + 1) == total_batches:
+            if (batch_id + 1) % log_interval == 0 or (batch_id + 1) == total_batches:
                 loss_val = res.get("loss", 0.0)
                 lr_val = res.get("lr", 0.0)
-                logger.bind(mode="train").info(
-                    f"Epoch [{self.current_epoch}] | Batch [{batch_id + 1}/{total_batches}] "
+                epoch_str = format_zero_pad(self.current_epoch + 1, self.max_epochs)
+                batch_str = format_zero_pad(batch_id + 1, total_batches)
+                logger.bind(mode="train").opt(colors=True).info(
+                    f"Epoch [{epoch_str}/{self.max_epochs}] | Batch [{batch_str}/{total_batches}] "
                     f"| Loss: <red>{loss_val:.4f}</red> | LR: <cyan>{lr_val:.6f}</cyan>"
                 )
         # 保存ckpt
@@ -196,29 +203,29 @@ class OwlEngine(StateMachine):
             scheduler_state = self.scheduler.state_dict() if self.scheduler else {}
             ckpt = CheckpointDict(
                 epoch=self.current_epoch,
-                model_state=self.model.state_dict(),
+                model_state=self.nn_model.state_dict(),
                 optimizer_state=optimizer_state,
                 scheduler_state=scheduler_state,
             )
-            save_name = f"ckpt_epoch_{self.current_epoch:03d}.pth"
+            save_name = f"ckpt_epoch_{format_zero_pad(self.current_epoch+1, self.max_epochs)}.pth"
             save_path = self.work_dir / "ckpt" / save_name
             save_checkpoint(ckpt, save_path)
-            logger.bind(mode="train").info(f"权重已自动保存至: {save_path}")
+            logger.bind(mode="train").opt(colors=True).info(f"权重已自动保存至: {save_path}")
 
     def _do_validate(self):
-        logger.bind(mode="val").info(f"--- 开始 Epoch [{self.current_epoch}] 验证 ---")
+        logger.bind(mode="val").opt(colors=True).info(f"--- 开始 Epoch [{self.current_epoch}] 验证 ---")
         epoch_metrics = {}
-        self.model.eval()
+        self.nn_model.eval()
         with torch.no_grad():
             for dataset_name, dataloader in self.val_loaders.items():
                 if self.evaluator:
                     self.evaluator.reset()
                 for batch_data in dataloader:
                     batch_data: DataSetBatch
-                    batch_data['tp_tensors'] = batch_data['tp_tensors'].to(self.device, non_blocking=True,)
-                    batch_data['gt_tensors'] = batch_data['gt_tensors'].to(self.device, non_blocking=True,)
+                    batch_data['tp_tensor'] = batch_data['tp_tensor'].to(self.device, non_blocking=True,)
+                    batch_data['gt_tensor'] = batch_data['gt_tensor'].to(self.device, non_blocking=True,)
                     # 获取输出
-                    outputs = self.model(
+                    outputs = self.nn_model(
                         batch_data,
                         current_epoch=self.current_epoch,
                         current_step=self.current_step
@@ -230,21 +237,20 @@ class OwlEngine(StateMachine):
                     epoch_metrics[dataset_name] = self.evaluator.compute()
 
             if epoch_metrics:
-                from ..toolkits.common.fmt import format_metrics_table
                 table_str = format_metrics_table(epoch_metrics, current_epoch=self.current_epoch)
                 if table_str:
-                    logger.bind(mode="val").opt(raw=True).info(table_str)
+                    logger.bind(mode="val").opt(colors=True).opt(raw=True).info(table_str)
 
     def _do_visualize(self):
-        self.model.eval()
+        self.nn_model.eval()
         with torch.no_grad():
             for dataset_name, dataloader in self.val_loaders.items():
                 for batch_data in dataloader:
                     batch_data: DataSetBatch
-                    batch_data['tp_tensors'] = batch_data['tp_tensors'].to(self.device, non_blocking=True, )
-                    batch_data['gt_tensors'] = batch_data['gt_tensors'].to(self.device, non_blocking=True, )
+                    batch_data['tp_tensor'] = batch_data['tp_tensor'].to(self.device, non_blocking=True, )
+                    batch_data['gt_tensor'] = batch_data['gt_tensor'].to(self.device, non_blocking=True, )
                     # 模型输出
-                    outputs = self.model(
+                    outputs = self.nn_model(
                         batch_data,
                         current_epoch=self.current_epoch,
                         current_step=self.current_step

@@ -56,7 +56,7 @@ class TrainStepPipeline(StateMachine):
                  scheduler: torch.optim.lr_scheduler.LRScheduler | None=None,
                  device:torch.device=torch.device("cpu"),
                  non_blocking: bool = True):
-        self.model = model
+        self.nn_model = model
         self.optimizer = optimizer
         self.criterion = criterion
         self.scheduler = scheduler
@@ -82,7 +82,7 @@ class TrainStepPipeline(StateMachine):
 
     def on_event_forward(self):
         """前向传播"""
-        self.ctx_outputs = self.model(
+        self.ctx_outputs = self.nn_model(
             batch_data=self.ctx_batch,
             current_epoch=self.ctx_epoch,
             current_step=self.ctx_step
@@ -128,8 +128,8 @@ class TrainStepPipeline(StateMachine):
         self.ctx_epoch = current_epoch
         self.ctx_step = current_step
 
-        batch_data['tp_tensors'] = batch_data['tp_tensors'].to(self.device, non_blocking=self.non_blocking)
-        batch_data['gt_tensors'] = batch_data['gt_tensors'].to(self.device, non_blocking=self.non_blocking)
+        batch_data['tp_tensor'] = batch_data['tp_tensor'].to(self.device, non_blocking=self.non_blocking)
+        batch_data['gt_tensor'] = batch_data['gt_tensor'].to(self.device, non_blocking=self.non_blocking)
         self.ctx_batch = batch_data
 
         self.event_zero_grad()
