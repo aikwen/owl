@@ -38,18 +38,18 @@ class DataSetBatch(TypedDict):
     """一个 Batch 的数据字典结构。由多个 DataSetItem 组成
 
     Attributes:
-        tp_tensors (torch.Tensor): 批次级篡改图像张量。
+        tp_tensor (torch.Tensor): 批次级篡改图像张量。
             Shape: [B, 3, H, W]
-        gt_tensors (torch.Tensor): 批次级真实标签张量。
+        gt_tensor (torch.Tensor): 批次级真实标签张量。
             Shape: [B, 1, H, W]。
-        tp_names (list[str]): 当前 Batch 中所有样本的图像文件名列表。
+        tp_name (list[str]): 当前 Batch 中所有样本的图像文件名列表。
             列表长度等于 Batch Size。
-        gt_names (list[str]): 当前 Batch 中所有样本的标签文件名列表。
+        gt_name (list[str]): 当前 Batch 中所有样本的标签文件名列表。
     """
-    tp_tensors: torch.Tensor
-    gt_tensors: torch.Tensor
-    tp_names: list[str]
-    gt_names: list[str]
+    tp_tensor: torch.Tensor
+    gt_tensor: torch.Tensor
+    tp_name: list[str]
+    gt_name: list[str]
 
 
 class DataLoaderConfig(TypedDict):
