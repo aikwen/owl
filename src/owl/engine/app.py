@@ -5,6 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 from statemachine import StateMachine, State
 from datetime import datetime
+
+from ..toolkits.common.ckpt import load_checkpoint
 from .state import AppState, ExecMode
 from .engine import OwlEngine
 from ..toolkits.evaluator import EVALUATORS
@@ -19,7 +21,7 @@ from ..toolkits.criterion.base import OwlCriterion
 from ..toolkits.visualizer.base import OwlVisualizer
 from ..toolkits.data.dataloader import OwlDataLoader
 from ..toolkits.common import fs
-from ..toolkits.common.types import CheckpointDict
+from ..toolkits.common.ckpt import CheckpointDict
 
 
 class OwlApp(StateMachine):
@@ -94,7 +96,7 @@ class OwlApp(StateMachine):
 
         # 检查权重是否存在，存在的话就加载权重
         if str(checkpoint_path).strip():
-            ckpt: CheckpointDict = fs.load_checkpoint(checkpoint_path, device=self.device)
+            ckpt: CheckpointDict = load_checkpoint(checkpoint_path, device=self.device)
             self.model.load_state_dict(ckpt["model_state"])
 
             if mode == ExecMode.TRAIN:
@@ -172,6 +174,7 @@ class OwlApp(StateMachine):
 
         Args:
             mode (ExecMode):任务执行模式，可选 `TRAIN`, `VALIDATE`, `VISUALIZE`。
+            ckpt_autosave (bool): 是否在每一轮自动保存权重
             max_epochs (int, optional): 最大运行轮次。当 mode 为 VALIDATE 或 VISUALIZE 时，内部会强制重置为 1。默认为 1。
             checkpoint_path (str, optional): 断点续训或预训练权重的文件路径（如 '.pth'） 若为空字符串，则模型使用随机初始化权重。默认为 ""。
             device (str, optional): 目标物理设备，例如 "cuda", "cuda:0" 或 "cpu"。默认为 "cpu"。
