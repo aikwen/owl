@@ -33,12 +33,12 @@ class OwlApp(StateMachine):
     # ==========================================
     # AppState
     # ==========================================
-    empty_state = State(AppState.EMPTY.value, initial=True)    # 空状态
-    instantiated_state = State(AppState.INSTANTIATED.value)    # 实例化组件
-    mounted_state = State(AppState.MOUNTED.value)              # 初始化权重，device 之类
-    running_state = State(AppState.RUNNING.value)              # 进入运行
-    finished_state = State(AppState.FINISHED.value)            # 运行结束
-    error_state = State(AppState.ERROR.value)                  # 错误
+    empty_state = State(AppState.EMPTY.value, initial=True)                # 空状态
+    instantiated_state = State(AppState.INSTANTIATED.value)                # 实例化组件
+    mounted_state = State(AppState.MOUNTED.value)                          # 初始化权重，device 之类
+    running_state = State(AppState.RUNNING.value)                          # 进入运行
+    finished_state = State(AppState.FINISHED.value, final=True)            # 运行结束
+    error_state = State(AppState.ERROR.value, final=True)                  # 错误
 
     # ========================================================================
     # 状态转移图
@@ -61,7 +61,7 @@ class OwlApp(StateMachine):
 
     def __init__(self):
         # --- 存放实例化的组件 ---
-        self.model: OwlModel | None = None
+        self.nn_model: OwlModel | None = None
         self.criterion: OwlCriterion | None = None
         self.optimizer: torch.optim.Optimizer | None = None
         self.scheduler: Any | None  = None
@@ -90,14 +90,14 @@ class OwlApp(StateMachine):
         """
         self.device = torch.device(device)
 
-        self.model.to(self.device)
+        self.nn_model.to(self.device)
         if self.criterion:
             self.criterion.to(self.device)
 
         # 检查权重是否存在，存在的话就加载权重
         if str(checkpoint_path).strip():
             ckpt: CheckpointDict = load_checkpoint(checkpoint_path, device=self.device)
-            self.model.load_state_dict(ckpt["model_state"])
+            self.nn_model.load_state_dict(ckpt["model_state"])
 
             if mode == ExecMode.TRAIN:
                 if self.optimizer and "optimizer_state" in ckpt:
@@ -116,7 +116,7 @@ class OwlApp(StateMachine):
             self.start_epoch = 0
 
         self.engine = OwlEngine(
-            model=self.model,
+            model=self.nn_model,
             criterion=self.criterion,
             optimizer=self.optimizer,
             scheduler=self.scheduler,
@@ -218,24 +218,25 @@ class OwlApp(StateMachine):
 
         try:
             # empty -> instantiated：实例化组件
+            kwargs = locals().copy()
+            kwargs.pop("self", None)
+            safe_kwargs = self._default(**kwargs)
             self.event_instantiate(
-                work_dir="",
-                ckpt_autosave=ckpt_autosave,
-                max_epochs=max_epochs,
-                model_name=model_name,             model_cfg=model_cfg,
-                criterion_name=criterion_name,     criterion_cfg=criterion_cfg,
-                optimizer_name=optimizer_name,     optimizer_cfg=optimizer_cfg,
-                scheduler_name=scheduler_name,     scheduler_cfg=scheduler_cfg,
-                visualizer_name=visualizer_name,   visualizer_cfg=visualizer_cfg,
-                evaluator_name=evaluator_name,     evaluator_cfg=evaluator_cfg,
-                owl_train_loader=owl_train_loader, owl_val_loaders=owl_val_loaders,
+                **safe_kwargs,
             )
 
             # instantiated -> mounted： 加载权重、移动 device...
-            self.event_mount(mode=mode, checkpoint_path=checkpoint_path, device=device)
+            self.event_mount(
+                mode=safe_kwargs["mode"],
+                checkpoint_path=safe_kwargs["checkpoint_path"],
+                device=safe_kwargs["device"]
+            )
 
             # mounted -> RUNNING： 开始运行
-            self.event_start(mode=mode, max_epochs=max_epochs)
+            self.event_start(
+                mode=safe_kwargs["mode"],
+                max_epochs=safe_kwargs["max_epochs"]
+            )
 
             # RUNNING -> FINISHED： 结束
             self.event_complete()
@@ -248,7 +249,7 @@ class OwlApp(StateMachine):
         from ..toolkits.common.logger import OwlLogger
         OwlLogger.stop()
 
-    def before_event_instantiate(self, **kwargs):
+    def _default(self, **kwargs):
         """event_instantiate hook
 
         对输入的参数进行检查和设置默认值
@@ -300,7 +301,6 @@ class OwlApp(StateMachine):
                 raise ValueError(f"参数错误: {mode.value} 模式下 'owl_val_loaders' 不能为空。")
 
         # 设置默认值
-        # 默认日志目录
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
         current_work_dir = pathlib.Path(f"./{timestamp}")
         kwargs["work_dir"] = current_work_dir
@@ -328,7 +328,6 @@ class OwlApp(StateMachine):
 
         if kwargs.get("visualizer_name"):
             v_cfg = kwargs.get("visualizer_cfg") or {}
-
             user_save_dir = v_cfg.get("save_dir")
             if not user_save_dir:
                 # 用户没传，使用默认的 `工作区/visual`
@@ -364,6 +363,7 @@ class OwlApp(StateMachine):
                      scheduler_name: str | None, scheduler_cfg: dict[str, Any]| None ,
                      visualizer_name: str | None, visualizer_cfg: dict[str, Any]|None,
                      evaluator_name: str | None, evaluator_cfg: dict[str, Any] | None,
+                     **kwargs,
                      ):
         """Empty -> Instantiated：只用来实例化组件
         """
@@ -374,7 +374,7 @@ class OwlApp(StateMachine):
         OwlLogger.setup(work_dir=self.work_dir)
         OwlLogger.welcome()
 
-        self.model = MODELS.build(model_name, **model_cfg)
+        self.nn_model = MODELS.build(model_name, **model_cfg)
         self.criterion = CRITERIA.build(criterion_name, **criterion_cfg)
 
         """实例化 optimizer, 自动注入model
@@ -384,7 +384,7 @@ class OwlApp(StateMachine):
         """
         if optimizer_name:
             injected_kwargs = {
-                "model": self.model,
+                "model": self.nn_model,
             }
             optimizer_cfg.update(injected_kwargs)
             self.optimizer = OPTIMIZERS.build(optimizer_name, **optimizer_cfg)
