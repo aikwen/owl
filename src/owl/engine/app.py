@@ -352,6 +352,7 @@ class OwlApp(StateMachine):
         return kwargs
 
     def on_event_instantiate(self,
+                     mode: ExecMode,
                      work_dir: pathlib.Path,
                      max_epochs: int,
                      ckpt_autosave: bool,
@@ -375,47 +376,57 @@ class OwlApp(StateMachine):
         OwlLogger.welcome()
 
         self.nn_model = MODELS.build(model_name, **model_cfg)
-        self.criterion = CRITERIA.build(criterion_name, **criterion_cfg)
-
-        """实例化 optimizer, 自动注入model
-         @OPTIMIZERS.register(name="adamw")
-         def adamw(model: nn.Module, lr: float, weight_decay: float) -> optim.Optimizer:
-            return optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-        """
-        if optimizer_name:
-            injected_kwargs = {
-                "model": self.nn_model,
-            }
-            optimizer_cfg.update(injected_kwargs)
-            self.optimizer = OPTIMIZERS.build(optimizer_name, **optimizer_cfg)
-        # 数据加载器
-        self.train_loader = owl_train_loader.get_train_loader() if owl_train_loader else None
         self.val_loaders = owl_val_loaders.get_valid_loaders() if owl_val_loaders else {}
+        if mode == ExecMode.TRAIN:
+            self.criterion = CRITERIA.build(criterion_name, **criterion_cfg)
 
-        """实例化 scheduler， 自动注入optimizer，epochs，batches
-        @SCHEDULERS.register(name="poly")
-        def poly(optimizer: optim.Optimizer, power: float, epochs: int, batches: int) -> optim.lr_scheduler.LRScheduler:
-            total_iters = epochs * batches
-            return optim.lr_scheduler.PolynomialLR(
-                optimizer=optimizer,
-                total_iters=total_iters,
-                power=power
-            )
-        """
-        if scheduler_name:
-            injected_kwargs = {
-                "optimizer": self.optimizer,
-                "epochs": max_epochs,
-                "batches": len(self.train_loader) if self.train_loader else 1
-            }
+            """实例化 optimizer, 自动注入model
+             @OPTIMIZERS.register(name="adamw")
+             def adamw(model: nn.Module, lr: float, weight_decay: float) -> optim.Optimizer:
+                return optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+            """
+            if optimizer_name:
+                injected_kwargs = {
+                    "model": self.nn_model,
+                }
+                optimizer_cfg.update(injected_kwargs)
+                self.optimizer = OPTIMIZERS.build(optimizer_name, **optimizer_cfg)
+            # 加载训练数据
+            self.train_loader = owl_train_loader.get_train_loader() if owl_train_loader else None
 
-            scheduler_cfg = scheduler_cfg or {}
-            scheduler_cfg.update(injected_kwargs)
-            self.scheduler = SCHEDULERS.build(scheduler_name, **scheduler_cfg)
+            """实例化 scheduler， 自动注入optimizer，epochs，batches
+            @SCHEDULERS.register(name="poly")
+            def poly(optimizer: optim.Optimizer, power: float, epochs: int, batches: int) -> optim.lr_scheduler.LRScheduler:
+                total_iters = epochs * batches
+                return optim.lr_scheduler.PolynomialLR(
+                    optimizer=optimizer,
+                    total_iters=total_iters,
+                    power=power
+                )
+            """
+            if scheduler_name:
+                injected_kwargs = {
+                    "optimizer": self.optimizer,
+                    "epochs": max_epochs,
+                    "batches": len(self.train_loader) if self.train_loader else 1
+                }
 
-        if visualizer_name:
-            self.visualizer = VISUALIZERS.build(visualizer_name, **(visualizer_cfg or {}))
+                scheduler_cfg = scheduler_cfg or {}
+                scheduler_cfg.update(injected_kwargs)
+                self.scheduler = SCHEDULERS.build(scheduler_name, **scheduler_cfg)
 
-        if evaluator_name:
-            self.evaluator = EVALUATORS.build(evaluator_name, **(evaluator_cfg or {}))
+        if mode == ExecMode.VISUALIZE:
+            if visualizer_name:
+                self.visualizer = VISUALIZERS.build(visualizer_name, **(visualizer_cfg or {}))
+            else:
+                raise ValueError(
+                    "参数错误: VISUALIZE 模式下必须指定 'visualizer_name'，"
+                )
+        if mode == ExecMode.VALIDATE:
+            if evaluator_name:
+                self.evaluator = EVALUATORS.build(evaluator_name, **(evaluator_cfg or {}))
+            else:
+                raise ValueError(
+                    "参数错误: VALIDATE 模式下必须指定 'evaluator_name'"
+                )
 
