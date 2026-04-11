@@ -12,6 +12,7 @@ from ..toolkits.criterion.base import OwlCriterion
 from ..toolkits.visualizer.base import OwlVisualizer
 from ..toolkits.data.types import DataSetBatch
 from ..toolkits.common.logger import logger
+from ..toolkits.common.ckpt import CheckpointDict, save_checkpoint
 
 class OwlEngine(StateMachine):
     """Owl level 2
@@ -189,6 +190,20 @@ class OwlEngine(StateMachine):
                     f"Epoch [{self.current_epoch}] | Batch [{batch_id + 1}/{total_batches}] "
                     f"| Loss: <red>{loss_val:.4f}</red> | LR: <cyan>{lr_val:.6f}</cyan>"
                 )
+        # 保存ckpt
+        if self.ckpt_autosave:
+            optimizer_state = self.optimizer.state_dict() if self.optimizer else {}
+            scheduler_state = self.scheduler.state_dict() if self.scheduler else {}
+            ckpt = CheckpointDict(
+                epoch=self.current_epoch,
+                model_state=self.model.state_dict(),
+                optimizer_state=optimizer_state,
+                scheduler_state=scheduler_state,
+            )
+            save_name = f"ckpt_epoch_{self.current_epoch:03d}.pth"
+            save_path = self.work_dir / "ckpt" / save_name
+            save_checkpoint(ckpt, save_path)
+            logger.bind(mode="train").info(f"权重已自动保存至: {save_path}")
 
     def _do_validate(self):
         logger.bind(mode="val").info(f"--- 开始 Epoch [{self.current_epoch}] 验证 ---")
