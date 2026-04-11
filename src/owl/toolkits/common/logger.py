@@ -34,10 +34,10 @@ class OwlLogger:
         # ==========================================
         _logger.add(
             sys.stdout,
-            # <green> 等标签是 loguru 特有的，会让这部分文字变色
-            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> - <level>{message}</level>",
             level="INFO",   # 只打印 INFO 及以上级别的日志
             colorize=True,  # 开启颜色
+            filter=lambda record: "mode" not in record["extra"],
             enqueue=True    # 开启异步/多线程安全
         )
 
@@ -48,7 +48,7 @@ class OwlLogger:
         _logger.add(
             str(train_log_path),
             # 纯文本 format
-            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{line} - {message}",
+            format="{time:YYYY-MM-DD HH:mm:ss} - {message}",
             level="INFO",
             filter=lambda record: record["extra"].get("mode", "train") == "train",  # 默认接收 train 模式的日志
             rotation="100 MB",  # 文件超过 100MB 自动打包
@@ -62,7 +62,7 @@ class OwlLogger:
         val_log_path = work_dir.joinpath("validate.log")
         _logger.add(
             str(val_log_path),
-            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{line} - {message}",
+            format="{time:YYYY-MM-DD HH:mm:ss} - {message}",
             level="INFO",
             filter=lambda record: record["extra"].get("mode") == "val",  # 只有被标记为 val 的日志才会存到这里
             rotation="100 MB",
