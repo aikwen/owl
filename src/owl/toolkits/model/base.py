@@ -20,7 +20,7 @@ class OwlModel(nn.Module, ABC):
             **kwargs: 保留字典，用于接收未来框架可能会下发的其他扩展上下文参数。
 
         Returns:
-            ModelOutput: 模型的输出，实际上是一个字典，必须包含 prediction key，作为 Evaluator 自动提取结果；
+            ModelOutput: 模型的输出，实际上是一个字典，必须包含 logits key，作为 Evaluator 自动提取结果；
             比如::
                 >>> class Model(OwlModel):
                 >>>     def __init__(self, ...):
