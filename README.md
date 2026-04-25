@@ -32,6 +32,8 @@ Run the following command in any directory to generate a training script (e.g., 
 owl init
 ```
 
+The generated template uses `example/` as a placeholder dataset directory. Replace it with your own dataset path in actual use.
+
 ## Dataset Structure
 
 ```text
