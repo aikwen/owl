@@ -177,26 +177,42 @@ class OwlEngine(StateMachine):
         )
 
     def _do_train_epoch(self):
-        logger.bind(mode="train").opt(colors=True).info(f"--- 开始 Epoch [{self.current_epoch}/{self.max_epochs - 1}] 训练 ---")
+        logger.bind(mode="train").opt(colors=True).info(f"--- 开始 Epoch [{self.current_epoch + 1}/{self.max_epochs}] 训练 ---")
         self.nn_model.train()
         total_batches = len(self.train_loader)
         # 日志打印频率
-        expected_logs_per_epoch = 3000
+        expected_logs_per_epoch = 1000
         log_interval = max(1, total_batches // expected_logs_per_epoch)
+        # 区间loss
+        interval_loss_sum = 0.0
+        interval_loss_count = 0
 
         for batch_id, batch_data in enumerate(self.train_loader):
             batch_data: DataSetBatch
             self.current_step += 1
             res = self.train_pipeline.do_step_flow(batch_data, self.current_epoch, self.current_step)
+
+            # 损失统计
+            loss_val = float(res.get("loss", 0.0))
+            lr_val = res.get("lr", 0.0)
+            interval_loss_sum += loss_val
+            interval_loss_count += 1
+
             if (batch_id + 1) % log_interval == 0 or (batch_id + 1) == total_batches:
-                loss_val = res.get("loss", 0.0)
-                lr_val = res.get("lr", 0.0)
+                avg_loss = interval_loss_sum / max(1, interval_loss_count)
+
                 epoch_str = format_zero_pad(self.current_epoch + 1, self.max_epochs)
                 batch_str = format_zero_pad(batch_id + 1, total_batches)
+
                 logger.bind(mode="train").opt(colors=True).info(
                     f"Epoch [{epoch_str}/{self.max_epochs}] | Batch [{batch_str}/{total_batches}] "
-                    f"| Loss: <red>{loss_val:.4f}</red> | LR: <cyan>{lr_val:.6f}</cyan>"
+                    f"| interval_avg_loss: <red>{avg_loss:.4f}</red> "
+                    f"| LR: <cyan>{lr_val:.6f}</cyan>"
                 )
+
+                # 清空
+                interval_loss_sum = 0.0
+                interval_loss_count = 0
         # 保存ckpt
         if self.ckpt_autosave:
             optimizer_state = self.optimizer.state_dict() if self.optimizer else {}
