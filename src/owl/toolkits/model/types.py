@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, Any
 
 import torch
 
@@ -18,5 +18,7 @@ class ModelOutput(TypedDict, total=False):
     Attributes:
         logits (torch.Tensor): 模型的原始、未经过激活函数处理的预测输出。
             值域为 (-inf, +inf)。
+        extra: 模型自定义输出，例如辅助监督 logits、中间特征、可视化信息等。
     """
     logits: torch.Tensor
+    extra: dict[str, Any]
