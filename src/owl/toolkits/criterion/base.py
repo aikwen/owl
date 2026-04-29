@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
-import torch
+
 import torch.nn as nn
 
 from ..data import types
 from ..model.types import ModelOutput
+from .types import CriterionReturn
 
+__all__ = ["OwlCriterion"]
 
 class OwlCriterion(nn.Module, ABC):
     """Owl 损失函数协议基类。
@@ -12,7 +14,7 @@ class OwlCriterion(nn.Module, ABC):
 
     @abstractmethod
     def forward(self, model_outputs: ModelOutput, batch_data: types.DataSetBatch, current_epoch: int = 0, current_step: int = 0,
-                **kwargs) -> torch.Tensor:
+                **kwargs) -> CriterionReturn:
         """计算模型预测结果与真实标签之间的损失值。
 
         Args:
@@ -23,6 +25,16 @@ class OwlCriterion(nn.Module, ABC):
             **kwargs: 保留字典，用于接收扩展上下文参数。
 
         Returns:
-            torch.Tensor: 一个零维度的标量张量 (Scalar Tensor)，代表当前批次的最终综合损失值。会直接调用其 `.backward()` 方法来计算梯度。
-        """
+            CriterionReturn:
+                允许返回两种格式：
+
+                1. ``torch.Tensor``:
+                    旧版兼容写法，表示最终综合损失。
+                    框架会直接对该 Tensor 调用 backward。
+
+                2. ``CriterionOutput``:
+                    新版推荐写法，必须包含 loss 字段；
+                    可选 extra 字段。
+                    其中 loss 用于 backward，metrics 用于日志、状态服务、可视化。
+                """
         pass
