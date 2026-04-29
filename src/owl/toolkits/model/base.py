@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from .types import ModelOutput
+from .types import ModelReturn
 import torch.nn as nn
 
 from ..data import types
@@ -11,7 +11,11 @@ class OwlModel(nn.Module, ABC):
     """
 
     @abstractmethod
-    def forward(self, batch_data: types.DataSetBatch, current_epoch: int = 0, current_step: int = 0, **kwargs) -> ModelOutput:
+    def forward(self,
+                batch_data: types.DataSetBatch,
+                current_epoch: int = 0,
+                current_step: int = 0,
+                **kwargs) -> ModelReturn:
         """执行模型的前向传播逻辑。
 
         Args:
@@ -24,6 +28,7 @@ class OwlModel(nn.Module, ABC):
         Returns:
             ModelOutput: 模型的输出，实际上是一个字典，必须包含 logits key，作为 Evaluator 自动提取结果；
             比如::
+                >>> import torch
                 >>> class Model(OwlModel):
                 >>>     def __init__(self, ...):
                 >>>         super().__init__()
