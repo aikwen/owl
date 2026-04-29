@@ -65,7 +65,9 @@ class TrainStepPipeline(StateMachine):
         # 上下文变量 (Context Variables)
         self.ctx_batch: DataSetBatch | None = None
         self.ctx_outputs: Any = None
+        self.ctx_model_extra: dict[str, Any] = {}
         self.ctx_loss: torch.Tensor | None = None
+        self.ctx_loss_extra: dict[str, Any] = {}
         self.non_blocking = non_blocking
         self.ctx_epoch: int = 0
         self.ctx_step: int = 0
@@ -87,18 +89,27 @@ class TrainStepPipeline(StateMachine):
             current_epoch=self.ctx_epoch,
             current_step=self.ctx_step
         )
+        self.ctx_model_extra = self.ctx_outputs.get("extra", {})
 
     def on_event_compute_loss(self):
         """计算损失"""
-        self.ctx_loss = self.criterion(
+        loss = self.criterion(
             model_outputs=self.ctx_outputs,
             batch_data=self.ctx_batch,
             current_epoch=self.ctx_epoch,
             current_step=self.ctx_step
         )
+        if isinstance(loss, torch.Tensor):
+            self.ctx_loss = loss
+            self.ctx_loss_extra = {}
+        else:
+            self.ctx_loss = loss["loss"]
+            self.ctx_loss_extra = loss.get("extra", {})
 
     def on_event_backward(self):
         """反向传播"""
+        if self.ctx_loss is None:
+            raise RuntimeError("ctx_loss is None before backward.")
         self.ctx_loss.backward()
 
     def on_event_optimize(self):
@@ -143,4 +154,10 @@ class TrainStepPipeline(StateMachine):
         return {
             "loss": self.ctx_loss.item() if self.ctx_loss is not None else 0.0,
             "lr": self.optimizer.param_groups[0]['lr'],
+            "extra":{
+                "metrics": {
+                    "loss": self.ctx_loss_extra.get("metrics", {}),
+                    "model": self.ctx_model_extra.get("metrics", {}),
+                }
+            }
         }
