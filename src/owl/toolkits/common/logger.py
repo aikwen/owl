@@ -90,6 +90,13 @@ class OwlLogger:
     @classmethod
     def stop(cls):
         """打印结束语"""
-        _logger.opt(colors=True).info("<cyan>owl engine</cyan> is stopped!")
+        if not cls._initialized:
+            return
 
+        _logger.opt(colors=True).info("<cyan>owl engine</cyan> is stopped!")
+        _logger.complete()
+
+    @classmethod
+    def is_initialized(cls) -> bool:
+        return cls._initialized
 logger = _logger
