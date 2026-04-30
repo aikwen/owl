@@ -21,7 +21,7 @@ class ModelOutput(TypedDict, total=False):
         extra: 模型自定义输出，例如辅助监督 ``logits``、中间特征、可视化信息等。
                 ``extra["metrics"]`` 如果存在，会被 Owl 训练监控器自动提取，
                 用于日志、状态服务、可视化等旁路观测功能。
-                ``extra["metrics"]`` 应只包含轻量级、可序列化或可安全转换的值，
+                ``extra["metrics"]`` 应只包含轻量级、可序列化或可安全转换的值，推荐是 ``float`` 常量
                 例如 ``float/int/str/bool/None``，或零维 ``Tensor``。
                 不建议放入大 ``Tensor``、中间特征或需要保留计算图的对象。
     """
