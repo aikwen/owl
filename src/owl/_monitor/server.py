@@ -25,6 +25,8 @@ class MonitorServerHandle:
     transport: MonitorTransport
     address: str
     thread: threading.Thread
+    server: uvicorn.Server
+    socket_path: pathlib.Path | None = None
 
 
 def start_monitor_server(
@@ -33,16 +35,6 @@ def start_monitor_server(
     config: MonitorConfig,
     work_dir: str | pathlib.Path,
 ) -> MonitorServerHandle:
-    """启动训练监控服务。
-
-    Args:
-        state: 训练监控运行状态。
-        config: 训练监控配置。
-        work_dir: 当前训练运行目录。
-
-    Returns:
-        监控服务句柄。
-    """
     work_dir = pathlib.Path(work_dir)
     transport = config.normalized_transport()
 
@@ -62,6 +54,32 @@ def start_monitor_server(
         )
 
     raise ValueError(f"unsupported monitor transport: {transport}")
+
+
+def stop_monitor_server(
+    handle: MonitorServerHandle | None,
+    *,
+    timeout: float = 5.0,
+) -> None:
+    """停止训练监控服务。"""
+
+    if handle is None:
+        return
+
+    handle.server.should_exit = True
+
+    if handle.thread.is_alive():
+        handle.thread.join(timeout=timeout)
+
+    if (
+        handle.transport == MonitorTransport.UNIX
+        and handle.socket_path is not None
+        and handle.socket_path.exists()
+    ):
+        try:
+            handle.socket_path.unlink()
+        except OSError:
+            pass
 
 
 def _start_unix_server(
@@ -107,6 +125,8 @@ def _start_unix_server(
         transport=MonitorTransport.UNIX,
         address=str(socket_path),
         thread=thread,
+        server=server,
+        socket_path=socket_path,
     )
 
 
@@ -148,4 +168,5 @@ def _start_http_server(
         transport=MonitorTransport.HTTP,
         address=address,
         thread=thread,
+        server=server,
     )

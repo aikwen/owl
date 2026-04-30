@@ -20,9 +20,14 @@ from ..toolkits.model.base import OwlModel
 from ..toolkits.criterion.base import OwlCriterion
 from ..toolkits.visualizer.base import OwlVisualizer
 from ..toolkits.data.dataloader import OwlDataLoader
-from .._monitor import MonitorConfig, MonitorState, MonitorServerHandle, start_monitor_server
 from ..toolkits.common.ckpt import CheckpointDict
-
+from .._monitor import (
+    MonitorConfig,
+    MonitorState,
+    MonitorServerHandle,
+    start_monitor_server,
+    stop_monitor_server,
+)
 
 class OwlApp(StateMachine):
     """Owl level 1
@@ -288,11 +293,11 @@ class OwlApp(StateMachine):
 
         except Exception as e:
             self.event_fail()
+            self._cleanup()
             raise e
 
     def on_event_complete(self):
-        from ..toolkits.common.logger import OwlLogger
-        OwlLogger.stop()
+        self._cleanup()
 
     def _default(self, **kwargs):
         """event_instantiate hook
@@ -494,3 +499,13 @@ class OwlApp(StateMachine):
                     "参数错误: VALIDATE 模式下必须指定 'evaluator_name'"
                 )
 
+    def _shutdown_monitor(self):
+        if self.monitor_handle is not None:
+            stop_monitor_server(self.monitor_handle)
+            self.monitor_handle = None
+
+    def _cleanup(self):
+        # 关闭监控器
+        self._shutdown_monitor()
+        from ..toolkits.common.logger import OwlLogger
+        OwlLogger.stop()

@@ -1,8 +1,7 @@
-
 from .config import MonitorConfig, MonitorTransport
 from .snapshot import MonitorSnapshot
 from .state import MonitorState
-from .server import MonitorServerHandle, start_monitor_server
+from .server import MonitorServerHandle, start_monitor_server, stop_monitor_server
 
 __all__ = [
     "MonitorConfig",
@@ -11,4 +10,5 @@ __all__ = [
     "MonitorState",
     "MonitorServerHandle",
     "start_monitor_server",
+    "stop_monitor_server",
 ]
