@@ -1,24 +1,25 @@
-from .base import OwlCriterion
-from ..common import registry
-import importlib
 from typing import TYPE_CHECKING
+
+from .base import OwlCriterion
+from ..._internal.lazy import attach_lazy_modules
+from ..common.registry import Registry
 
 if TYPE_CHECKING:
     from . import base
+    from . import types
 
-_delayed_imports = {
-    "base": ".base",
-}
+__all__ = attach_lazy_modules(
+    target_globals=globals(),
+    package=__package__,
+    delayed_modules={
+        "base": ".base",
+        "types": ".types",
+    },
+)
 
-def __getattr__(name:str):
-    if name in _delayed_imports:
-        module =  importlib.import_module(_delayed_imports[name], package=__package__)
-        # 缓存
-        globals()[name] = module
-        return module
+CRITERIA = Registry[OwlCriterion]("criterion")
 
-    raise AttributeError(f"module 'core' has no attribute '{name}'")
-
-CRITERIA = registry.Registry[OwlCriterion]("criterion")
-
-__all__ = ["CRITERIA", "base"]
+__all__.extend([
+    "OwlCriterion",
+    "CRITERIA",
+])

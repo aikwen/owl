@@ -1,24 +1,23 @@
-import importlib
 from typing import TYPE_CHECKING
-from ..common import registry
+
+from .base import OwlVisualizer
+from ..._internal.lazy import attach_lazy_modules
+from ..common.registry import Registry
 
 if TYPE_CHECKING:
-    from .base import OwlVisualizer
+    from . import base
 
-_delayed_imports = {
-    "base": ".base",
-}
+__all__ = attach_lazy_modules(
+    target_globals=globals(),
+    package=__package__,
+    delayed_modules={
+        "base": ".base",
+    },
+)
 
-def __getattr__(name: str):
-    if name in _delayed_imports:
-        module = importlib.import_module(_delayed_imports[name], package=__package__)
-        # 缓存到 globals 中，下次访问不再触发 __getattr__
-        globals()[name] = module
-        return module
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+VISUALIZERS = Registry[OwlVisualizer]("visualizer")
 
-# 定义可视化组件注册表
-from .base import OwlVisualizer
-VISUALIZERS = registry.Registry[OwlVisualizer]("visualizer")
-
-__all__ = ["VISUALIZERS", "base"]
+__all__.extend([
+    "OwlVisualizer",
+    "VISUALIZERS",
+])

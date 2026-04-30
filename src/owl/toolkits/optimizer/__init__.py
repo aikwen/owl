@@ -1,10 +1,24 @@
-from torch import nn, optim
-from ..common import registry
+from typing import TYPE_CHECKING
 
-OPTIMIZERS = registry.Registry[optim.Optimizer]("optimizer")
+from torch import optim
 
-# 自动装载
+from ..._internal.lazy import attach_lazy_modules
+from ..common.registry import Registry
+
+if TYPE_CHECKING:
+    from . import adamw
+
+__all__ = attach_lazy_modules(
+    target_globals=globals(),
+    package=__package__,
+    delayed_modules={
+        "adamw": ".adamw",
+    },
+)
+
+OPTIMIZERS = Registry[optim.Optimizer]("optimizer")
+
+# 导入默认优化器实现，触发注册器注册
 from . import adamw
 
-__all__ = ["OPTIMIZERS"]
-
+__all__.append("OPTIMIZERS")
