@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "owl-imdl"
-version = "1.0.1"
+version = "1.0.2"
 description = "IMDL template engine"
 readme = "README.md"
 authors = [
@@ -22,6 +22,9 @@ dependencies = [
     "python-statemachine>=3.0.0",
     "questionary>=2.1.1",
     "prettytable>=3.17.0",
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
 ]
 
 [project.scripts]
