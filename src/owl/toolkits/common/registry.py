@@ -1,3 +1,4 @@
+import inspect
 from typing import Callable, Generic, TypeVar
 
 # 定义一个泛型类型 T
@@ -52,9 +53,11 @@ class Registry(Generic[T]):
 
         # kwargs 解包
         try:
-            return build_func(**kwargs)
+            inspect.signature(build_func).bind(**kwargs)
         except TypeError as e:
-            raise ValueError(f"构建组件 '{obj_type}' 失败，参数不匹配: {e}")
+            raise ValueError(f"构建组件 '{obj_type}' 失败，参数不匹配: {e}") from e
+
+        return build_func(**kwargs)
 
     def __contains__(self, key: str) -> bool:
         return key in self._obj_map
