@@ -53,7 +53,6 @@ def start_monitor_server(
             app=app,
             config=config,
             work_dir=work_dir,
-            state=state,
         )
 
     if transport == MonitorTransport.HTTP:
@@ -77,7 +76,6 @@ def _start_unix_server(
         app: FastAPI 应用实例。
         config: 训练监控配置。
         work_dir: 当前训练运行目录。
-        state: 训练监控运行状态。
 
     Returns:
         监控服务句柄。
