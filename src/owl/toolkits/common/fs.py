@@ -1,4 +1,3 @@
-# src/owl/toolkit/common/file_io.py
 import pathlib
 import json
 from typing import Any, Union
