@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from ..._internal.lazy import attach_lazy_modules
-from ..common.registry import Registry
+from ..._internal.registry import Registry
 
 if TYPE_CHECKING:
     from . import base
