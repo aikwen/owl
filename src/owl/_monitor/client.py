@@ -72,7 +72,7 @@ def stream_from_uds(socket_path: str | pathlib.Path) -> Iterator[dict[str, Any]]
 def stream_from_http(base_url: str) -> Iterator[dict[str, Any]]:
     """通过 HTTP 读取监控流。
 
-    该函数暂时保留给 Windows 使用。第一版主要使用 UDS。
+    该函数暂时保留给 Windows 使用。
 
     Args:
         base_url: 监控服务 HTTP 地址。
