@@ -87,6 +87,9 @@ class OwlApp(StateMachine):
         self.monitor_config: MonitorConfig | None = None
         self.monitor_state: MonitorState | None = None
         self.monitor_handle: MonitorServerHandle | None = None
+
+        # --- clean ---
+        self._cleaned: bool = False
         super().__init__()
 
     def on_event_mount(
@@ -291,10 +294,14 @@ class OwlApp(StateMachine):
             # RUNNING -> FINISHED： 结束
             self.event_complete()
 
-        except Exception as e:
-            self.event_fail()
-            self._cleanup()
-            raise e
+        except KeyboardInterrupt:
+            from ..toolkits.common.logger import logger
+            logger.warning("received Ctrl+C, owl stopped by user")
+            self._fail_and_cleanup()
+            return
+        except Exception:
+            self._fail_and_cleanup()
+            raise
 
     def on_event_complete(self):
         self._cleanup()
@@ -506,6 +513,19 @@ class OwlApp(StateMachine):
 
     def _cleanup(self):
         # 关闭监控器
+        if self._cleaned:
+            return
+
+        self._cleaned = True
         self._shutdown_monitor()
         from ..toolkits.common.logger import OwlLogger
-        OwlLogger.stop()
+        if OwlLogger.is_initialized():
+            OwlLogger.stop()
+
+    def _fail_and_cleanup(self):
+        try:
+            self.event_fail()
+        except Exception:
+            pass
+        finally:
+            self._cleanup()
