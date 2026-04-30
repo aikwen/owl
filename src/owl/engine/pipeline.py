@@ -50,12 +50,15 @@ class TrainStepPipeline(StateMachine):
     # 重置
     event_reset_pipeline = ended_state.to(started_state)
 
-    def __init__(self, model: OwlModel,
-                 criterion: OwlCriterion,
-                 optimizer: torch.optim.Optimizer,
-                 scheduler: torch.optim.lr_scheduler.LRScheduler | None=None,
-                 device:torch.device=torch.device("cpu"),
-                 non_blocking: bool = True):
+    def __init__(
+        self,
+        model: OwlModel,
+        criterion: OwlCriterion,
+        optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler.LRScheduler | None=None,
+        device:torch.device=torch.device("cpu"),
+        non_blocking: bool = True
+    ):
         self.nn_model = model
         self.optimizer = optimizer
         self.criterion = criterion
@@ -125,7 +128,12 @@ class TrainStepPipeline(StateMachine):
         """"""
         pass
 
-    def do_step_flow(self, batch_data: DataSetBatch, current_epoch: int = 0, current_step: int = 0) -> dict[str, Any]:
+    def do_step_flow(
+        self,
+        batch_data: DataSetBatch,
+        current_epoch: int = 0,
+        current_step: int = 0,
+    ) -> dict[str, Any]:
         """
 
         Args:
@@ -154,10 +162,8 @@ class TrainStepPipeline(StateMachine):
         return {
             "loss": self.ctx_loss.item() if self.ctx_loss is not None else 0.0,
             "lr": self.optimizer.param_groups[0]['lr'],
-            "extra":{
-                "metrics": {
-                    "loss": self.ctx_loss_extra.get("metrics", {}),
-                    "model": self.ctx_model_extra.get("metrics", {}),
-                }
+            "metrics":{
+                "loss": self.ctx_loss_extra.get("metrics", {}),
+                "model": self.ctx_model_extra.get("metrics", {}),
             }
         }

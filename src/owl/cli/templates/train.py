@@ -91,7 +91,7 @@ def main():
         max_epochs=10,
         ckpt_autosave=True,   # 自动保存
         device="cuda" if torch.cuda.is_available() else "cpu",
-
+        monitor=True,
         # 挂载组件
         model_name="dummy_model",
         model_cfg={"in_channels": 3},

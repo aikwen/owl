@@ -14,6 +14,7 @@ from ..toolkits.data.types import DataSetBatch
 from ..toolkits.common.logger import logger
 from ..toolkits.common.ckpt import CheckpointDict, save_checkpoint
 from ..toolkits.common.fmt import format_zero_pad, format_metrics_table
+from .._monitor import MonitorSnapshot, MonitorState
 
 class OwlEngine(StateMachine):
     """Owl level 2
@@ -62,17 +63,20 @@ class OwlEngine(StateMachine):
     event_validate_to_end = validate_state.to(end_state)
     event_visual_to_end = visual_state.to(end_state)
 
-    def __init__(self,
-                 model: OwlModel,
-                 criterion: OwlCriterion | None,
-                 work_dir: str | pathlib.Path,
-                 ckpt_autosave: bool,
-                 optimizer: torch.optim.Optimizer | None,
-                 scheduler: Any | None,
-                 train_loader: DataLoader | None,
-                 val_loaders:  dict[str, DataLoader] | None,
-                 evaluator: OwlEvaluator | None = None,
-                 visualizer:   OwlVisualizer | None = None,):
+    def __init__(
+        self,
+        model: OwlModel,
+        criterion: OwlCriterion | None,
+        work_dir: str | pathlib.Path,
+        ckpt_autosave: bool,
+        optimizer: torch.optim.Optimizer | None,
+        scheduler: Any | None,
+        train_loader: DataLoader | None,
+        val_loaders:  dict[str, DataLoader] | None,
+        evaluator: OwlEvaluator | None = None,
+        visualizer:   OwlVisualizer | None = None,
+        monitor_state: MonitorState | None = None,
+    ):
 
         # 必要的组件
         self.nn_model: OwlModel = model
@@ -97,14 +101,18 @@ class OwlEngine(StateMachine):
         self.current_epoch: int = 0
         self.current_step:  int = 0
         self.max_epochs:    int = 1
-
+        # monitor
+        self.monitor_state = monitor_state
         super().__init__()
 
 
-    def run(self, mode: ExecMode,
-            max_epochs:  int = 1,
-            start_epoch: int = 0,
-            device: torch.device | str = torch.device("cpu")):
+    def run(
+        self,
+        mode: ExecMode,
+        max_epochs:  int = 1,
+        start_epoch: int = 0,
+        device: torch.device | str = torch.device("cpu"),
+    ):
         """总入口"""
         self.current_mode = mode
         self.max_epochs = max_epochs
@@ -192,6 +200,9 @@ class OwlEngine(StateMachine):
             self.current_step += 1
             res = self.train_pipeline.do_step_flow(batch_data, self.current_epoch, self.current_step)
 
+            # 提交res
+            self._emit_monitor_snapshot(res)
+
             # 损失统计
             loss_val = float(res.get("loss", 0.0))
             lr_val = res.get("lr", 0.0)
@@ -277,3 +288,19 @@ class OwlEngine(StateMachine):
                             outputs=outputs,
                             dataset_name=dataset_name
                         )
+
+    def _emit_monitor_snapshot(self, step_result: dict[str, Any] | None) -> None:
+        """提交训练监控快照。
+
+        Args:
+            step_result: 当前 step 返回的状态数据。
+        """
+        if self.monitor_state is None:
+            return
+
+        snapshot = MonitorSnapshot.from_train_step(
+            epoch=self.current_epoch,
+            step=self.current_step,
+            step_result=step_result,
+        )
+        self.monitor_state.update(snapshot)
