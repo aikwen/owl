@@ -113,7 +113,7 @@ class OwlApp(StateMachine):
         if str(checkpoint_path).strip():
             ckpt: CheckpointDict = load_checkpoint(checkpoint_path, device=self.device)
             self.nn_model.load_state_dict(ckpt["model_state"])
-            from ..toolkits.common.logger import logger
+            from .._internal.logger import logger
             logger.info(f"成功加载模型权重: {checkpoint_path}")
 
             if mode == ExecMode.TRAIN and not finetune:
@@ -156,7 +156,7 @@ class OwlApp(StateMachine):
                 config=self.monitor_config,
                 work_dir=self.work_dir,
             )
-            from ..toolkits.common.logger import logger
+            from .._internal.logger import logger
             logger.bind(mode="train").info(
                 f"monitor server started: {self.monitor_handle.address}"
             )
@@ -295,7 +295,7 @@ class OwlApp(StateMachine):
             self.event_complete()
 
         except KeyboardInterrupt:
-            from ..toolkits.common.logger import logger
+            from .._internal.logger import logger
             logger.warning("received Ctrl+C, owl stopped by user")
             self._fail_and_cleanup()
             return
@@ -446,7 +446,7 @@ class OwlApp(StateMachine):
         self.work_dir = work_dir
         self.ckpt_autosave = ckpt_autosave
         # 打印日志
-        from ..toolkits.common.logger import OwlLogger
+        from .._internal.logger import OwlLogger
         OwlLogger.setup(work_dir=self.work_dir)
         OwlLogger.welcome()
 
@@ -518,7 +518,7 @@ class OwlApp(StateMachine):
 
         self._cleaned = True
         self._shutdown_monitor()
-        from ..toolkits.common.logger import OwlLogger
+        from .._internal.logger import OwlLogger
         if OwlLogger.is_initialized():
             OwlLogger.stop()
 

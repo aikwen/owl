@@ -11,9 +11,9 @@ from ..toolkits.model.base import OwlModel
 from ..toolkits.criterion.base import OwlCriterion
 from ..toolkits.visualizer.base import OwlVisualizer
 from ..toolkits.data.types import DataSetBatch
-from ..toolkits.common.logger import logger
+from .._internal.logger import logger
 from ..toolkits.common.ckpt import CheckpointDict, save_checkpoint
-from ..toolkits.common.fmt import format_zero_pad, format_metrics_table
+from .._internal.fmt import format_zero_pad, format_metrics_table
 from .._monitor import MonitorSnapshot, MonitorState
 
 class OwlEngine(StateMachine):

@@ -7,8 +7,6 @@ if TYPE_CHECKING:
     from . import seed
     from . import metrics
     from . import ckpt
-    from . import fmt
-    from . import logger
 
 from ..._internal.lazy import attach_lazy_modules
 
@@ -22,7 +20,5 @@ __all__ = attach_lazy_modules(
         "seed": ".seed",
         "metrics": ".metrics",
         "ckpt": ".ckpt",
-        "fmt": ".fmt",
-        "logger": ".logger",
     },
 )

@@ -1,4 +1,4 @@
-from src.owl.toolkits.common.fmt import format_metrics_table
+from owl._internal.fmt import format_metrics_table
 
 if __name__ == "__main__":
     mock_metrics = {
