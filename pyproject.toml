@@ -1,33 +1,64 @@
 [build-system]
-requires = ["setuptools>=61.0.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "owl-imdl"
-version = "0.0.1"
-description = "IMDL template engine"
+dynamic = ["version"]
+description = ''
 readme = "README.md"
-authors = [
-  {name = "kwen", email = "aikwen@outlook.com"},
-]
+requires-python = ">=3.11"
 license = "MIT"
+keywords = [
+
+]
+authors = [
+  { name = "aikwen", email = "kwen.zou@outlook.com" },
+]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
 ]
-requires-python = ">=3.10"
+
 dependencies = [
-    "loguru>=0.7.3",
-    "rich>=13.4.0",
-    "python-statemachine>=3.0.0",
-    "questionary>=2.1.1",
-    "prettytable>=3.17.0",
-    "grpcio>=1.80.0",
-    "protobuf>=6.31.1",
+  "pydantic>=2",
 ]
 
-[project.scripts]
-owl = "owl.cli.main:main"
+[project.urls]
+Documentation = "https://github.com/aikwen/owl#readme"
+Issues = "https://github.com/aikwen/owl/issues"
+Source = "https://github.com/aikwen/owl"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.version]
+path = "src/owl/__about__.py"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/owl tests}"
+
+[tool.coverage.run]
+source_pkgs = ["owl", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/owl/__about__.py",
+]
+
+[tool.coverage.paths]
+owl = ["src/owl", "*/owl/src/owl"]
+tests = ["tests", "*/owl/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+[tool.hatch.build.targets.wheel]
+packages = ["src/owl"]
