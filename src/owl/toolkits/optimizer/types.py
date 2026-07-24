@@ -1,0 +1,1 @@
+OPTIMIZER_REQUIRED_PARAMS = ("model",)
