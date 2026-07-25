@@ -9,7 +9,7 @@ owning invocation modules. The active workspace is supplied by the public
 invocation orchestration entry point.
 """
 
-from ..invocation.components.checkpoint import resolve_model_checkpoint
+from ..invocation.components.checkpoint import resolve_checkpoint
 from ..invocation.components.model import resolve_model
 from ..invocation.data.infer import resolve_infer_data
 from ..invocation.infer import InferInvocation
@@ -76,9 +76,10 @@ def invoke_infer(
     model = resolve_model(components.model)
     model.to(execution.device)
 
-    resolve_model_checkpoint(
+    resolve_checkpoint(
         components.checkpoint,
         model=model,
+        model_only=True,
     )
 
     dataloaders = resolve_infer_data(invocation.data)
