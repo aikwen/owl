@@ -1,8 +1,14 @@
-"""Learning-rate scheduler factory protocol definitions.
+"""Learning-rate scheduler constructor protocol definitions.
 
-This module defines the protocol used by owl clients to construct learning-rate
-schedulers. A scheduler factory is created during configuration and invoked
-later after the optimizer and training plan have become available.
+This module defines the callable protocol used by owl to construct
+learning-rate schedulers after the optimizer and training plan have been
+resolved.
+
+A scheduler constructor is typically created during configuration, where it
+captures user-defined options such as the warmup duration and minimum
+learning-rate ratio. Owl later injects the resolved optimizer and training-plan
+values and invokes the constructor to create the scheduler used by the training
+session.
 """
 
 from typing import Protocol
@@ -11,21 +17,14 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 
-class SchedulerFactory(Protocol):
-    """Protocol implemented by learning-rate scheduler factories.
+class SchedulerConstructor(Protocol):
+    """Callable that constructs a scheduler from injected training objects.
 
-    Scheduler construction is divided into two stages.
+    Scheduler construction is commonly divided into two stages.
 
-    The outer function receives user-defined options such as the warmup
-    duration and minimum learning-rate ratio. It captures those options and
-    returns a scheduler factory.
-
-    The owl client later invokes that factory with the instantiated optimizer
-    and the complete training plan. The returned scheduler is then stored in
-    the training session.
-
-    Example:
-        Define an outer configuration function:
+    The outer configuration function receives user-defined options such as the
+    warmup duration and minimum learning-rate ratio. It captures those options
+    and returns a scheduler constructor:
 
         >>> import math
         >>>
@@ -35,8 +34,8 @@ class SchedulerFactory(Protocol):
         >>> def create_cosine_scheduler(
         ...     *,
         ...     min_lr_ratio: float = 0.0,
-        ... ) -> SchedulerFactory:
-        ...     def factory(
+        ... ) -> SchedulerConstructor:
+        ...     def constructor(
         ...         *,
         ...         optimizer: Optimizer,
         ...         total_epochs: int,
@@ -44,34 +43,46 @@ class SchedulerFactory(Protocol):
         ...     ) -> LRScheduler:
         ...         def lr_lambda(step: int) -> float:
         ...             progress = min(step / total_steps, 1.0)
-        ...             cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
-        ...             return min_lr_ratio + (1.0 - min_lr_ratio) * cosine
+        ...             cosine = 0.5 * (
+        ...                 1.0 + math.cos(math.pi * progress)
+        ...             )
+        ...             return (
+        ...                 min_lr_ratio
+        ...                 + (1.0 - min_lr_ratio) * cosine
+        ...             )
         ...
-        ...         return LambdaLR(optimizer, lr_lambda)
+        ...         return LambdaLR(
+        ...             optimizer,
+        ...             lr_lambda,
+        ...         )
         ...
-        ...     return factory
+        ...     return constructor
 
-        Configure the scheduler before the optimizer is available:
+    The constructor can be configured before the optimizer and training plan
+    are available:
 
-        >>> scheduler_factory = create_cosine_scheduler(
+        >>> scheduler_constructor = create_cosine_scheduler(
         ...     min_lr_ratio=0.01,
         ... )
 
-        The owl client later injects the optimizer and training plan:
+    Owl later injects the resolved optimizer and training-plan values:
 
-        >>> scheduler = scheduler_factory(
+        >>> scheduler = scheduler_constructor(
         ...     optimizer=optimizer,
         ...     total_epochs=100,
         ...     total_steps=50000,
         ... )
 
-    Notes:
-        This protocol constrains only the inner factory. The signature of the
-        outer configuration function is intentionally unrestricted because
-        different scheduler implementations require different options.
+    Implementations do not need to inherit from this protocol. Any compatible
+    callable is accepted, including functions, closures, callable instances,
+    and class objects with a compatible call signature.
 
-        A scheduler factory may ignore training-plan values that are not needed
-        by its scheduling strategy.
+    The outer configuration function is not constrained by this protocol.
+    Different scheduler implementations may expose different configuration
+    parameters.
+
+    A scheduler constructor may ignore training-plan values that are not needed
+    by its scheduling strategy.
     """
 
     def __call__(
@@ -81,11 +92,11 @@ class SchedulerFactory(Protocol):
         total_epochs: int,
         total_steps: int,
     ) -> LRScheduler:
-        """Create a scheduler for the injected optimizer and training plan.
+        """Construct a scheduler from injected training objects.
 
         Args:
             optimizer:
-                Instantiated optimizer whose learning rate will be scheduled.
+                Resolved optimizer whose learning rate will be scheduled.
             total_epochs:
                 Total number of epochs configured for the training run.
             total_steps:

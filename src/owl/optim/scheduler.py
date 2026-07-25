@@ -11,12 +11,12 @@ from typing import cast
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler, PolynomialLR
 
-from ..schemas.optim import SchedulerFactory
+from ..schemas.optim import SchedulerConstructor
 
 __all__ = ["constant", "poly"]
 
 
-def constant() -> SchedulerFactory:
+def constant() -> SchedulerConstructor:
     """Create a constant learning-rate scheduler factory.
 
     The returned scheduler preserves the optimizer's initial learning rates
@@ -52,10 +52,10 @@ def constant() -> SchedulerFactory:
             lr_lambda=lambda _: 1.0,
         )
 
-    return cast(SchedulerFactory, factory)
+    return cast(SchedulerConstructor, factory)
 
 
-def poly(*, power: float = 1.0) -> SchedulerFactory:
+def poly(*, power: float = 1.0) -> SchedulerConstructor:
     """Create a configurable polynomial learning-rate scheduler factory.
 
     The polynomial power is configured immediately. The returned factory is
@@ -99,4 +99,4 @@ def poly(*, power: float = 1.0) -> SchedulerFactory:
             power=power,
         )
 
-    return cast(SchedulerFactory, factory)
+    return cast(SchedulerConstructor, factory)

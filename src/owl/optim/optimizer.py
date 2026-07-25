@@ -11,7 +11,7 @@ from typing import cast
 from torch.nn import Module
 from torch.optim import AdamW, Optimizer
 
-from ..schemas.optim import OptimizerFactory
+from ..schemas.optim import OptimizerConstructor
 
 __all__ = ["adamw"]
 
@@ -20,7 +20,7 @@ def adamw(
     *,
     lr: float,
     weight_decay: float,
-) -> OptimizerFactory:
+) -> OptimizerConstructor:
     """Create a configurable AdamW optimizer factory.
 
     The learning rate and weight decay are configured immediately. The
@@ -57,4 +57,4 @@ def adamw(
             weight_decay=weight_decay,
         )
 
-    return cast(OptimizerFactory, factory)
+    return cast(OptimizerConstructor, factory)

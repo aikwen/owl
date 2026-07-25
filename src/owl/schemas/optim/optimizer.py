@@ -1,8 +1,12 @@
-"""Optimizer factory protocol definitions.
+"""Optimizer constructor protocol definitions.
 
-This module defines the protocol used by owl clients to construct optimizers.
-An optimizer factory is created during configuration and invoked later after
-the model has been instantiated.
+This module defines the callable protocol used by owl to construct optimizers
+after the model has been resolved.
+
+An optimizer constructor is typically created during configuration, where it
+captures user-defined options such as the learning rate and weight decay. Owl
+later injects the resolved model and invokes the constructor to create the
+optimizer used by the training session.
 """
 
 from typing import Protocol
@@ -11,20 +15,14 @@ from torch.nn import Module
 from torch.optim import Optimizer
 
 
-class OptimizerFactory(Protocol):
-    """Protocol implemented by optimizer factories.
+class OptimizerConstructor(Protocol):
+    """Callable that constructs an optimizer from an injected model.
 
-    Optimizer construction is divided into two stages.
+    Optimizer construction is commonly divided into two stages.
 
-    The outer function receives user-defined options such as the learning rate
-    and weight decay. It captures those options and returns an optimizer
-    factory.
-
-    The owl client later invokes that factory with the instantiated model and
-    receives the optimizer used by the training session.
-
-    Example:
-        Define an outer configuration function:
+    The outer configuration function receives user-defined options such as the
+    learning rate and weight decay. It captures those options and returns an
+    optimizer constructor:
 
         >>> from torch.nn import Module
         >>> from torch.optim import AdamW, Optimizer
@@ -33,39 +31,42 @@ class OptimizerFactory(Protocol):
         ...     *,
         ...     lr: float = 1e-4,
         ...     weight_decay: float = 1e-2,
-        ... ) -> OptimizerFactory:
-        ...     def factory(*, model: Module) -> Optimizer:
+        ... ) -> OptimizerConstructor:
+        ...     def constructor(*, model: Module) -> Optimizer:
         ...         return AdamW(
         ...             model.parameters(),
         ...             lr=lr,
         ...             weight_decay=weight_decay,
         ...         )
         ...
-        ...     return factory
+        ...     return constructor
 
-        Configure the optimizer before the model is available:
+    The constructor can be configured before the model is available:
 
-        >>> optimizer_factory = create_adamw(
+        >>> optimizer_constructor = create_adamw(
         ...     lr=2e-4,
         ...     weight_decay=1e-2,
         ... )
 
-        The owl client later injects the instantiated model:
+    Owl later injects the resolved model:
 
-        >>> optimizer = optimizer_factory(model=model)
+        >>> optimizer = optimizer_constructor(model=model)
 
-    Notes:
-        This protocol constrains only the inner factory. The signature of the
-        outer configuration function is intentionally unrestricted because
-        different optimizer implementations require different options.
+    Implementations do not need to inherit from this protocol. Any compatible
+    callable is accepted, including functions, closures, callable instances,
+    and class objects with a compatible call signature.
+
+    The outer configuration function is not constrained by this protocol.
+    Different optimizer implementations may expose different configuration
+    parameters.
     """
 
     def __call__(self, *, model: Module) -> Optimizer:
-        """Create an optimizer for the injected model.
+        """Construct an optimizer for the injected model.
 
         Args:
             model:
-                Instantiated model whose parameters will be optimized.
+                Resolved model whose parameters will be optimized.
 
         Returns:
             Optimizer associated with the supplied model.

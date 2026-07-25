@@ -1,9 +1,9 @@
 """Optimization factory protocol definitions."""
 
-from .optimizer import OptimizerFactory
-from .scheduler import SchedulerFactory
+from .optimizer import OptimizerConstructor
+from .scheduler import SchedulerConstructor
 
 __all__ = [
-    "OptimizerFactory",
-    "SchedulerFactory",
+    "OptimizerConstructor",
+    "SchedulerConstructor",
 ]

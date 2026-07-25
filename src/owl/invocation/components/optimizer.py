@@ -49,7 +49,7 @@ from typing import Any, Mapping, Protocol, TypeAlias
 from torch.nn import Module
 from torch.optim import Optimizer
 
-from ...schemas.optim import OptimizerFactory
+from ...schemas.optim import OptimizerConstructor
 
 
 class OptimizerFactoryBuilder(Protocol):
@@ -66,7 +66,7 @@ class OptimizerFactoryBuilder(Protocol):
     the resolved model during ``resolve_optimizer()``.
     """
 
-    def __call__(self, **kwargs: Any) -> OptimizerFactory:
+    def __call__(self, **kwargs: Any) -> OptimizerConstructor:
         """Create and return an optimizer factory.
 
         Args:
@@ -97,8 +97,8 @@ mutations to caller-owned configuration do not alter the stored declaration.
 
 
 OptimizerDeclaration: TypeAlias = (
-    OptimizerFactory
-    | tuple[OptimizerFactoryBuilder, OptimizerArgs]
+        OptimizerConstructor
+        | tuple[OptimizerFactoryBuilder, OptimizerArgs]
 )
 """Optimizer construction specification accepted by an owl invocation.
 

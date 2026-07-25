@@ -59,7 +59,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from ...optim.scheduler import constant
-from ...schemas.optim import SchedulerFactory
+from ...schemas.optim import SchedulerConstructor
 
 
 class SchedulerFactoryBuilder(Protocol):
@@ -78,7 +78,7 @@ class SchedulerFactoryBuilder(Protocol):
     the resolved optimizer and training plan during ``resolve_scheduler()``.
     """
 
-    def __call__(self, **kwargs: Any) -> SchedulerFactory:
+    def __call__(self, **kwargs: Any) -> SchedulerConstructor:
         """Create and return a scheduler factory.
 
         Args:
@@ -109,9 +109,9 @@ mutations to caller-owned configuration do not alter the stored declaration.
 
 
 SchedulerDeclaration: TypeAlias = (
-    SchedulerFactory
-    | tuple[SchedulerFactoryBuilder, SchedulerArgs]
-    | None
+        SchedulerConstructor
+        | tuple[SchedulerFactoryBuilder, SchedulerArgs]
+        | None
 )
 """Scheduler construction specification accepted by an owl invocation.
 
