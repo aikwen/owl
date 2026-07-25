@@ -3,19 +3,50 @@
 This module defines the declarative configuration used to construct the
 training data pipeline and the resolver that materializes that configuration.
 
-Training data may contain multiple logical dataset sources. Each declaration
-is resolved into an independent ``OwlDataset``. Multiple datasets are combined
-in declaration order with ``ConcatDataset`` and exposed through one training
-``DataLoader``:
+Training data may contain one or multiple logical dataset sources. Each
+declaration is resolved into an independent ``OwlDataset``. Multiple datasets
+are combined in declaration order with ``ConcatDataset`` and exposed through
+one training ``DataLoader``:
 
     data declarations
     -> OwlDataset objects
     -> combined training dataset
     -> one DataLoader
+
+A single dataset may be declared directly:
+
+    TrainData(
+        sources="datasets/casia_v2",
+    )
+
+A dataset with a local entry-source override may also be declared directly:
+
+    TrainData(
+        sources=(
+            "datasets/custom_train",
+            CustomEntrySource,
+        ),
+    )
+
+Multiple datasets must be declared with a list:
+
+    TrainData(
+        sources=[
+            "datasets/casia_v2",
+            "datasets/coverage",
+            (
+                "datasets/custom_train",
+                CustomEntrySource,
+            ),
+        ],
+    )
+
+Using a list exclusively for multiple declarations keeps the syntax
+unambiguous: tuples represent one declaration with a local entry-source
+constructor, while lists represent multiple declarations.
 """
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from torch.utils.data import ConcatDataset, DataLoader
 
@@ -27,23 +58,34 @@ from .types import DataDeclaration
 class TrainData(_DataConfig):
     """Configuration describing the training data pipeline.
 
-    Every source declaration describes one logical training dataset. A
-    declaration may contain only a dataset root:
+    One dataset may be supplied directly as a ``DataDeclaration``.
 
-        "datasets/casia_v2"
+    A compact declaration contains only a dataset root:
 
-    In that form, the inherited ``entry`` field supplies the entry-source
-    constructor.
+        sources="datasets/casia_v2"
 
-    A declaration may instead provide a local entry-source override:
+    In that form, the inherited ``default_entry_source`` constructor is used.
 
-        (
+    A declaration may instead provide a local entry-source constructor:
+
+        sources=(
             "datasets/custom_train",
             CustomEntrySource,
         )
 
-    The local entry-source constructor takes precedence over the default
-    constructor stored in ``entry``.
+    The local constructor takes precedence over
+    ``default_entry_source`` for that declaration.
+
+    Multiple datasets must be supplied as a list:
+
+        sources=[
+            "datasets/casia_v2",
+            "datasets/coverage",
+            (
+                "datasets/custom_train",
+                CustomEntrySource,
+            ),
+        ]
 
     All resolved datasets share the configured augmentation pipeline and sample
     hook. DataLoader options apply to the final combined training dataset rather
@@ -51,22 +93,35 @@ class TrainData(_DataConfig):
 
     Attributes:
         sources:
-            Ordered training dataset declarations. The supplied sequence is
-            converted into a tuple during initialization so later mutations to
-            the caller-owned sequence do not affect the configuration.
+            One training dataset declaration or a list of declarations.
+
+            A direct ``DataDeclaration`` represents one dataset. A list
+            represents multiple datasets in declaration order.
+
+            The declarations are normalized into an immutable tuple during
+            initialization so later mutations to a caller-owned list do not
+            affect the configuration.
     """
 
-    sources: Sequence[DataDeclaration]
+    sources: DataDeclaration | list[DataDeclaration] = field(
+        default_factory=list,
+    )
 
     def __post_init__(self) -> None:
-        """Copy shared options and freeze the source collection shape."""
+        """Copy shared options and normalize source declarations."""
 
         _DataConfig.__post_init__(self)
+
+        sources = (
+            tuple(self.sources)
+            if isinstance(self.sources, list)
+            else (self.sources,)
+        )
 
         object.__setattr__(
             self,
             "sources",
-            tuple(self.sources),
+            sources,
         )
 
 
@@ -89,7 +144,6 @@ def resolve_train_data(config: TrainData) -> DataLoader:
         ValueError:
             If no training sources are declared.
     """
-
     if not config.sources:
         raise ValueError(
             "training data must declare at least one dataset source"
@@ -98,7 +152,7 @@ def resolve_train_data(config: TrainData) -> DataLoader:
     datasets = [
         _build_dataset(
             declaration,
-            default_entry=config.entry,
+            default_entry=config.default_entry_source,
             augment=config.augment,
             hook=config.hook,
         )

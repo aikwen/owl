@@ -27,11 +27,12 @@ from pathlib import Path
 import albumentations as A
 
 from ...data.augment import SampleHook
+from ...data.entry.owl_v1 import OwlV1EntrySource
 from ...data.dataset import OwlDataset
 from ...data.entry import EntrySource
 from .types import (
     DataDeclaration,
-    EntrySourceType,
+    EntrySourceConstructor,
     LoaderOptions,
 )
 
@@ -49,7 +50,7 @@ class _DataConfig:
     entry sources, datasets, and dataloaders.
 
     Attributes:
-        entry:
+        default_entry_source:
             Default entry-source class used to interpret compact dataset
             declarations.
 
@@ -103,7 +104,7 @@ class _DataConfig:
             named inference dataset.
     """
 
-    entry: EntrySourceType
+    default_entry_source: EntrySourceConstructor = OwlV1EntrySource
     augment: A.Compose | None = None
     hook: SampleHook | None = None
     loader: LoaderOptions = field(default_factory=dict)
@@ -131,7 +132,7 @@ class _DataConfig:
 def _build_entry_source(
     declaration: DataDeclaration,
     *,
-    default_entry: EntrySourceType,
+    default_entry: EntrySourceConstructor,
 ) -> EntrySource:
     """Construct one entry source from a data declaration.
 
@@ -208,7 +209,7 @@ def _build_entry_source(
 def _build_dataset(
     declaration: DataDeclaration,
     *,
-    default_entry: EntrySourceType,
+    default_entry: EntrySourceConstructor,
     augment: A.Compose | None,
     hook: SampleHook | None,
 ) -> OwlDataset:

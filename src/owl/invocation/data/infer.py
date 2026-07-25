@@ -16,7 +16,7 @@ into ``InferSession``.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from torch.utils.data import DataLoader
 
@@ -55,7 +55,7 @@ class InferData(_DataConfig):
             configuration. Dictionary insertion order is preserved.
     """
 
-    sources: Mapping[str, DataDeclaration]
+    sources: Mapping[str, DataDeclaration] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Copy shared options and detach the source mapping."""
@@ -110,7 +110,7 @@ def resolve_infer_data(config: InferData) -> dict[str, DataLoader]:
 
         dataset = _build_dataset(
             declaration,
-            default_entry=config.entry,
+            default_entry=config.default_entry_source,
             augment=config.augment,
             hook=config.hook,
         )

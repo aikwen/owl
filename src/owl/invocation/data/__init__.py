@@ -25,7 +25,7 @@ from .infer import InferData, resolve_infer_data
 from .train import TrainData, resolve_train_data
 from .types import (
     DataDeclaration,
-    EntrySourceType,
+    EntrySourceConstructor,
     LoaderOptions,
     PathLike,
 )
@@ -33,7 +33,7 @@ from .types import (
 
 __all__ = [
     "DataDeclaration",
-    "EntrySourceType",
+    "EntrySourceConstructor",
     "InferData",
     "LoaderOptions",
     "PathLike",
