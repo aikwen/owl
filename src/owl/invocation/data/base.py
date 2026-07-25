@@ -142,7 +142,7 @@ def _build_entry_source(
         "datasets/casia_v1"
 
     Override declarations contain a dataset root and a local entry-source
-    class:
+    constructor:
 
         (
             "datasets/custom",
@@ -155,55 +155,50 @@ def _build_entry_source(
 
     Args:
         declaration:
-            Compact root declaration or ``(root, entry_source_type)`` override.
+            Compact root declaration or
+            ``(root, entry_source_constructor)`` override.
+
         default_entry:
-            Entry-source class used by compact declarations.
+            Entry-source constructor used by compact declarations.
 
     Returns:
         Constructed entry source.
 
     Raises:
         TypeError:
-            If the declaration shape, dataset root, or entry-source declaration
-            is invalid.
+            If the declaration shape, dataset root, or selected entry-source
+            constructor is invalid.
     """
     if isinstance(declaration, (str, Path)):
         root = declaration
-        entry_type = default_entry
+        constructor = default_entry
 
     elif isinstance(declaration, tuple):
         if len(declaration) != 2:
             raise TypeError(
                 "data declaration tuple must contain exactly "
-                "(root, entry_source_type)"
+                "(root, entry_source_constructor)"
             )
 
-        root, entry_type = declaration
+        root, constructor = declaration
 
         if not isinstance(root, (str, Path)):
             raise TypeError(
                 "data declaration root must be a string or Path"
             )
 
-        if not isinstance(entry_type, type):
-            raise TypeError(
-                "data declaration entry source must be a class"
-            )
-
     else:
         raise TypeError(
             "data declaration must be a string, Path, or "
-            "(root, entry_source_type) tuple"
+            "(root, entry_source_constructor) tuple"
         )
 
-    if not isinstance(default_entry, type):
+    if not callable(constructor):
         raise TypeError(
-            "default entry source must be a class"
+            "entry source constructor must be callable"
         )
 
-    source = entry_type(Path(root))
-
-    return source
+    return constructor(Path(root))
 
 
 def _build_dataset(
