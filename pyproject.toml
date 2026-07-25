@@ -23,7 +23,9 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
 ]
 
-dependencies = []
+dependencies = [
+  "typer>=0.27,<1",
+]
 
 [project.urls]
 Documentation = "https://github.com/aikwen/owl#readme"
@@ -60,3 +62,6 @@ exclude_lines = [
 ]
 [tool.hatch.build.targets.wheel]
 packages = ["src/owl"]
+
+[project.scripts]
+owl = "owl.cli:main"
