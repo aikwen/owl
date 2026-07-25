@@ -1,1 +1,0 @@
-BATCH_SCHEDULER_REQUIRED_PARAMS = ("optimizer", "epochs", "batches")
