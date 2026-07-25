@@ -4,36 +4,95 @@ This module defines the learning-rate scheduler forms accepted by owl
 invocations and provides the resolver that constructs the final scheduler
 instance.
 
-Scheduler construction follows the two-stage factory protocol defined in
-``owl.schemas.optim``.
+Scheduler construction is delayed until the optimizer and complete training
+plan have been resolved. Owl therefore receives a scheduler constructor rather
+than an already instantiated scheduler.
 
-The outer callable receives user-defined scheduler options and returns a
-``SchedulerFactory``:
+A scheduler constructor is a callable that accepts the resolved optimizer and
+training-plan values:
 
-    scheduler_factory = create_scheduler(
-        warmup_steps=1000,
-        min_lr_ratio=0.01,
-    )
-
-The returned factory receives the resolved optimizer and training plan:
-
-    scheduler = scheduler_factory(
+    scheduler = scheduler_constructor(
         optimizer=optimizer,
         total_epochs=total_epochs,
         total_steps=total_steps,
     )
 
-An invocation may receive one of three scheduler forms:
+An invocation may supply an already configured constructor directly:
 
-- an already configured ``SchedulerFactory``;
-- an outer builder paired with the keyword arguments used to create a factory;
-- ``None``, requesting owl's built-in constant learning-rate scheduler.
+    scheduler_constructor = create_scheduler(
+        warmup_steps=1000,
+        min_lr_ratio=0.01,
+    )
 
-An already configured factory may be supplied directly:
+    invocation = TrainInvocation(
+        scheduler=scheduler_constructor,
+        ...
+    )
 
-    scheduler=scheduler_factory
+An outer configuration callable may instead be paired with the keyword
+arguments used to create the constructor:
 
-An outer builder may be paired with user-defined options:
+    invocation = TrainInvocation(
+        scheduler=(
+            create_scheduler,
+            {
+                "warmup_steps": 1000,
+                "min_lr_ratio": 0.01,
+            },
+        ),
+        ...
+    )
+
+During resolution, owl first creates the configured constructor:
+
+    scheduler_constructor = create_scheduler(
+        warmup_steps=1000,
+        min_lr_ratio=0.01,
+    )
+
+Owl then injects the resolved optimizer and training-plan values:
+
+    scheduler = scheduler_constructor(
+        optimizer=optimizer,
+        total_epochs=total_epochs,
+        total_steps=total_steps,
+    )
+
+The absence of an explicit scheduling strategy may be expressed with ``None``:
+
+    invocation = TrainInvocation(
+        scheduler=None,
+        ...
+    )
+
+In that form, owl uses its built-in constant learning-rate constructor.
+
+Concrete ``LRScheduler`` instances are deliberately excluded because a
+scheduler must be associated with the final optimizer selected by the
+invocation.
+"""
+
+from collections.abc import Callable, Mapping
+from typing import Any, TypeAlias
+
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
+
+from ...optim.scheduler import constant
+from ...schemas.optim import SchedulerConstructor
+
+
+SchedulerArgs: TypeAlias = Mapping[str, Any]
+"""Keyword arguments supplied to a scheduler configuration callable.
+
+The mapping is expanded as keyword arguments when resolving a configured
+scheduler declaration:
+
+    scheduler_constructor = configure_scheduler(
+        **dict(scheduler_args),
+    )
+
+For example:
 
     scheduler=(
         create_scheduler,
@@ -43,65 +102,16 @@ An outer builder may be paired with user-defined options:
         },
     )
 
-The absence of an explicit scheduling strategy may be expressed with ``None``:
+is resolved as:
 
-    scheduler=None
+    scheduler_constructor = create_scheduler(
+        warmup_steps=1000,
+        min_lr_ratio=0.01,
+    )
 
-During ``owl.invoke()``, ``resolve_scheduler()`` converts each form into a
-``torch.optim.lr_scheduler.LRScheduler`` instance. The resolved optimizer and
-training-plan values are supplied explicitly because scheduler construction
-depends on resources produced earlier in the invocation pipeline.
-"""
-
-from typing import Any, Mapping, Protocol, TypeAlias
-
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
-
-from ...optim.scheduler import constant
-from ...schemas.optim import SchedulerConstructor
-
-
-class SchedulerFactoryBuilder(Protocol):
-    """Protocol for callables that create scheduler factories.
-
-    The builder represents the outer stage of scheduler construction. It
-    receives arbitrary user-defined keyword arguments and returns a
-    ``SchedulerFactory``.
-
-    The outer signature is intentionally unrestricted because scheduling
-    strategies may expose different configuration values, such as warmup
-    duration, polynomial power, minimum learning-rate ratio, milestones, or
-    decay factors.
-
-    The returned factory follows the stable owl scheduler protocol and receives
-    the resolved optimizer and training plan during ``resolve_scheduler()``.
-    """
-
-    def __call__(self, **kwargs: Any) -> SchedulerConstructor:
-        """Create and return a scheduler factory.
-
-        Args:
-            **kwargs: User-defined scheduler configuration values accepted by
-                the concrete builder.
-
-        Returns:
-            Factory that constructs a learning-rate scheduler for a resolved
-            optimizer and training plan.
-        """
-        ...
-
-
-SchedulerArgs: TypeAlias = Mapping[str, Any]
-"""Keyword arguments supplied to a scheduler factory builder.
-
-The mapping is expanded when ``resolve_scheduler()`` resolves a configured
-builder declaration:
-
-    scheduler_factory = builder(**dict(scheduler_args))
-
-A generic mapping is used because the outer builder signature belongs to the
-scheduler implementation rather than to owl.
+A generic mapping is used because scheduler configuration callables may expose
+different options such as warmup duration, polynomial power, minimum
+learning-rate ratio, milestones, and decay factors.
 
 Invocation objects may copy this mapping during initialization so later
 mutations to caller-owned configuration do not alter the stored declaration.
@@ -109,57 +119,75 @@ mutations to caller-owned configuration do not alter the stored declaration.
 
 
 SchedulerDeclaration: TypeAlias = (
-        SchedulerConstructor
-        | tuple[SchedulerFactoryBuilder, SchedulerArgs]
-        | None
+    SchedulerConstructor
+    | tuple[
+        Callable[..., SchedulerConstructor],
+        SchedulerArgs,
+    ]
+    | None
 )
 """Scheduler construction specification accepted by an owl invocation.
 
-The direct form contains an already configured ``SchedulerFactory``:
+Three declaration forms are supported.
 
-    scheduler_factory
+An already configured ``SchedulerConstructor`` may be supplied directly:
 
-This form is used when the outer configuration function has already been
-called:
-
-    scheduler_factory = poly(
+    scheduler_constructor = poly(
         power=0.9,
     )
 
-The configured-builder form contains an outer callable and the keyword
-arguments used to produce the scheduler factory:
-
-    (
-        create_scheduler,
-        {
-            "warmup_steps": 1000,
-            "min_lr_ratio": 0.01,
-        },
+    invocation = TrainInvocation(
+        scheduler=scheduler_constructor,
+        ...
     )
 
-The configured-builder form is resolved in two stages:
+A scheduler configuration callable may be paired with the keyword arguments
+used to create the constructor:
 
-    scheduler_factory = create_scheduler(
-        **scheduler_args,
+    invocation = TrainInvocation(
+        scheduler=(
+            poly,
+            {
+                "power": 0.9,
+            },
+        ),
+        ...
     )
 
-    scheduler = scheduler_factory(
+That form is resolved in two stages:
+
+    scheduler_constructor = poly(
+        power=0.9,
+    )
+
+    scheduler = scheduler_constructor(
         optimizer=optimizer,
         total_epochs=total_epochs,
         total_steps=total_steps,
     )
 
-The ``None`` form requests the built-in constant learning-rate strategy:
+Finally, ``None`` requests owl's built-in constant learning-rate strategy:
 
-    scheduler_factory = constant()
+    invocation = TrainInvocation(
+        scheduler=None,
+        ...
+    )
 
-That factory is invoked through the same scheduler protocol, keeping the
-training session structure uniform when no explicit learning-rate decay
-strategy is configured.
+This is equivalent to obtaining the built-in constructor first:
 
-Concrete ``LRScheduler`` instances are deliberately excluded. Scheduler
-construction depends on the final optimizer and resolved training plan, so it
-must occur after those resources are available.
+    scheduler_constructor = constant()
+
+and then invoking it through the same constructor protocol:
+
+    scheduler = scheduler_constructor(
+        optimizer=optimizer,
+        total_epochs=total_epochs,
+        total_steps=total_steps,
+    )
+
+Concrete ``LRScheduler`` instances are not accepted. Scheduler construction
+depends on the final optimizer and resolved training plan, so it must occur
+after those resources are available.
 """
 
 
@@ -170,63 +198,89 @@ def resolve_scheduler(
     total_epochs: int,
     total_steps: int,
 ) -> LRScheduler:
-    """Resolve a scheduler declaration for an optimizer and training plan.
+    """Resolve a scheduler declaration into a scheduler instance.
 
-    An already configured scheduler factory is invoked directly. A configured
-    builder declaration is first expanded into a scheduler factory. ``None`` is
-    resolved to owl's built-in constant scheduler factory.
+    An already configured scheduler constructor is invoked directly with the
+    supplied optimizer and training-plan values.
 
-    The resulting factory receives the supplied optimizer, total epoch count,
-    and total optimizer-step count.
+    A configured declaration first invokes its outer configuration callable
+    with the stored keyword arguments:
 
-    Exceptions raised by user-defined builders and factories are allowed to
-    propagate unchanged so callers retain the original exception type and
-    traceback.
+        scheduler_constructor = configure_scheduler(
+            **scheduler_args,
+        )
+
+    The resulting constructor is then invoked with resources resolved by owl:
+
+        scheduler = scheduler_constructor(
+            optimizer=optimizer,
+            total_epochs=total_epochs,
+            total_steps=total_steps,
+        )
+
+    When ``declaration`` is ``None``, owl obtains its built-in constant
+    scheduler constructor and invokes it through the same path.
+
+    Exceptions raised by user-defined configuration callables and constructors
+    are allowed to propagate unchanged so callers retain the original exception
+    type and traceback.
 
     Args:
-        declaration: Scheduler factory, configured factory-builder declaration,
-            or ``None`` for the built-in constant scheduler.
-        optimizer: Resolved optimizer whose learning rate will be scheduled.
-        total_epochs: Total number of epochs in the training plan.
-        total_steps: Total number of planned optimizer updates.
+        declaration:
+            Configured scheduler constructor, a scheduler configuration callable
+            paired with its keyword arguments, or ``None`` for the built-in
+            constant scheduler.
+        optimizer:
+            Resolved optimizer whose learning rate will be scheduled.
+        total_epochs:
+            Total number of epochs in the training plan.
+        total_steps:
+            Total number of planned optimizer updates.
 
     Returns:
-        Learning-rate scheduler constructed for the supplied optimizer and
-        training plan.
+        Learning-rate scheduler associated with the supplied optimizer.
 
     Raises:
-        TypeError: If the declaration does not match a supported scheduler
-            form, if a builder does not return a callable factory, or if the
-            factory does not return an ``LRScheduler`` instance.
+        TypeError:
+            If the declaration does not match a supported scheduler form, if
+            the configuration callable does not return a callable constructor,
+            or if the constructor does not return an ``LRScheduler`` instance.
     """
     if declaration is None:
-        scheduler_factory = constant()
+        scheduler_constructor = constant()
+
     elif isinstance(declaration, tuple):
         if len(declaration) != 2:
             raise TypeError(
-                "scheduler builder declaration must contain exactly "
-                "a builder and its keyword arguments"
+                "scheduler constructor declaration must contain exactly "
+                "a configuration callable and its keyword arguments"
             )
 
-        builder, scheduler_args = declaration
+        configure_scheduler, scheduler_args = declaration
 
-        if not callable(builder) or not isinstance(scheduler_args, Mapping):
+        if (
+            not callable(configure_scheduler)
+            or not isinstance(scheduler_args, Mapping)
+        ):
             raise TypeError(
-                "scheduler builder declaration must contain a callable "
-                "builder and a mapping of keyword arguments"
+                "scheduler constructor declaration must contain a callable "
+                "and a mapping of keyword arguments"
             )
 
-        scheduler_factory = builder(**dict(scheduler_args))
-    else:
-        scheduler_factory = declaration
-
-    if not callable(scheduler_factory):
-        raise TypeError(
-            "scheduler declaration must resolve to a callable "
-            "SchedulerFactory"
+        scheduler_constructor = configure_scheduler(
+            **dict(scheduler_args),
         )
 
-    scheduler = scheduler_factory(
+    else:
+        scheduler_constructor = declaration
+
+    if not callable(scheduler_constructor):
+        raise TypeError(
+            "scheduler declaration must resolve to a callable "
+            "SchedulerConstructor"
+        )
+
+    scheduler = scheduler_constructor(
         optimizer=optimizer,
         total_epochs=total_epochs,
         total_steps=total_steps,
@@ -234,7 +288,7 @@ def resolve_scheduler(
 
     if not isinstance(scheduler, LRScheduler):
         raise TypeError(
-            "scheduler factory must return a "
+            "scheduler constructor must return a "
             "torch.optim.lr_scheduler.LRScheduler instance"
         )
 
@@ -244,6 +298,5 @@ def resolve_scheduler(
 __all__ = [
     "SchedulerArgs",
     "SchedulerDeclaration",
-    "SchedulerFactoryBuilder",
     "resolve_scheduler",
 ]
