@@ -31,5 +31,4 @@ class SimpleMaskCriterion(Module):
 
         return {
             "loss": loss,
-            "metric:loss_bce": loss.detach().item()
         }
