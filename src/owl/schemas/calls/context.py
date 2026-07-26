@@ -6,6 +6,7 @@ mutable runtime or session objects to user components.
 """
 
 from dataclasses import dataclass
+from typing import TypeAlias
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,3 +55,11 @@ class TrainCallContext:
                 "current_batch must be in "
                 f"[0, {self.total_batches}), got {self.current_batch}"
             )
+
+ModelCallContext: TypeAlias = TrainCallContext | None
+"""Context accepted by model forward calls.
+
+Training calls receive a ``TrainCallContext``. Inference calls omit the
+context argument, so model implementations should provide ``None`` as the
+default value.
+"""
