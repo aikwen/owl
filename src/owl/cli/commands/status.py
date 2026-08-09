@@ -3,6 +3,7 @@
 import json
 import os
 import time
+from collections import deque
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -19,6 +20,7 @@ from ..app import app
 
 
 _POLL_INTERVAL_SECONDS = 0.5
+_SPEED_SAMPLE_WINDOW = 3
 _TITLE_MARGIN = 8
 _TERMINAL_STATUSES = {"completed", "interrupted"}
 
@@ -173,10 +175,64 @@ def _batch_progress(
     )
 
 
+def _training_position(
+    train: dict[str, Any],
+) -> tuple[int, float] | None:
+    """Return the global training batch position and update timestamp."""
+    epoch = train.get("epoch", {})
+    batch = train.get("batch", {})
+
+    if not isinstance(epoch, dict) or not isinstance(batch, dict):
+        return None
+
+    current_epoch = epoch.get("current")
+    current_batch = batch.get("current")
+    total_batch = batch.get("total")
+    updated_at = train.get("updated_at")
+
+    if (
+        not isinstance(current_epoch, int)
+        or not isinstance(current_batch, int)
+        or not isinstance(total_batch, int)
+        or not isinstance(updated_at, (int, float))
+        or current_epoch <= 0
+        or current_batch <= 0
+        or total_batch <= 0
+    ):
+        return None
+
+    global_batch = (
+        (current_epoch - 1) * total_batch
+        + current_batch
+    )
+
+    return global_batch, float(updated_at)
+
+
+def _training_speed(
+    samples: deque[tuple[int, float]],
+) -> float | None:
+    """Calculate average batch throughput across the sampled window."""
+    if len(samples) < 2:
+        return None
+
+    first_batch, first_time = samples[0]
+    last_batch, last_time = samples[-1]
+
+    elapsed = last_time - first_time
+    progressed = last_batch - first_batch
+
+    if elapsed <= 0 or progressed < 0:
+        return None
+
+    return progressed / elapsed
+
+
 def _build_view(
     title: str,
     lifecycle: dict[str, Any],
     train: dict[str, Any],
+    speed: float | None = None,
 ) -> Panel:
     """Build the workspace status panel."""
     epoch = train.get("epoch", {})
@@ -219,6 +275,17 @@ def _build_view(
     table.add_row(
         "Batch",
         _batch_progress(batch),
+    )
+
+    speed_text = (
+        f"{speed:.2f} batch/s"
+        if speed is not None
+        else "-"
+    )
+
+    table.add_row(
+        "Speed",
+        speed_text,
     )
 
     table.add_row("", "")
@@ -325,12 +392,24 @@ def status(
         )
         return
 
+    speed_samples: deque[tuple[int, float]] = deque(
+        maxlen=_SPEED_SAMPLE_WINDOW
+    )
+
+    initial_position = _training_position(train)
+
+    if initial_position is not None:
+        speed_samples.append(initial_position)
+
+    speed: float | None = None
+
     try:
         with Live(
             _build_view(
                 title,
                 lifecycle,
                 train,
+                speed,
             ),
             auto_refresh=False,
             transient=False,
@@ -345,11 +424,24 @@ def status(
                 if lifecycle is _READ_FAILED or train is _READ_FAILED:
                     continue
 
+                position = _training_position(train)
+
+                if position is not None:
+                    _, updated_at = position
+
+                    if (
+                        not speed_samples
+                        or updated_at != speed_samples[-1][1]
+                    ):
+                        speed_samples.append(position)
+                        speed = _training_speed(speed_samples)
+
                 live.update(
                     _build_view(
                         title,
                         lifecycle,
                         train,
+                        speed,
                     ),
                     refresh=True,
                 )

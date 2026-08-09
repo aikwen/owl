@@ -71,6 +71,7 @@ def main() -> None:
                     total_batch=_TOTAL_BATCHES,
                     loss=loss,
                     learning_rates=[learning_rate],
+                    updated_at=time.time(),
                 )
 
                 time.sleep(
