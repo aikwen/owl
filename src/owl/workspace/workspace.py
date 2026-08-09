@@ -22,7 +22,7 @@ from .specs.history.evaluation import EvaluationResults
 from .specs.metadata import WorkspaceMetadata, WorkspaceMode
 from .specs.snapshot.lifecycle import WorkspaceLifecycleStage
 from .writer.atomic import AtomicJsonWriter
-
+from time import time
 
 _METADATA_SCHEMA_VERSION = 1
 
@@ -229,7 +229,11 @@ class Workspace:
         loss: float,
         learning_rates: list[float],
     ) -> None:
-        """Update the current throttled training snapshot."""
+        """Update the current throttled training snapshot.
+
+        The update timestamp is captured when the training position is reported
+        to the workspace.
+        """
         snapshot_store, _ = self._require_active_stores()
 
         snapshot_store.update_train(
@@ -239,6 +243,7 @@ class Workspace:
             total_batch=total_batch,
             loss=loss,
             learning_rates=learning_rates,
+            updated_at=time(),
         )
 
     def append_train_history(

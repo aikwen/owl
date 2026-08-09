@@ -150,6 +150,7 @@ class _SnapshotStore:
         total_batch: int,
         loss: float,
         learning_rates: list[float],
+        updated_at: float,
     ) -> None:
         """Update the current training snapshot.
 
@@ -176,7 +177,8 @@ class _SnapshotStore:
 
             learning_rates:
                 Learning rates ordered according to optimizer parameter groups.
-
+            updated_at:
+                Unix timestamp associated with the current training position.
         Raises:
             RuntimeError:
                 If the store has not been started, its lifecycle has already
@@ -201,6 +203,7 @@ class _SnapshotStore:
             },
             "loss": loss,
             "learning_rates": list(learning_rates),
+            "updated_at": updated_at,
         }
 
         self._train_writer.update(snapshot)

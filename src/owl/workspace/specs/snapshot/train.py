@@ -2,8 +2,8 @@
 
 This module defines the current training snapshot stored in
 ``snapshot/train.json`` for each workspace. The snapshot describes the latest
-published training position together with the runtime values associated with
-that position.
+published training position together with the runtime values and publication
+time associated with that position.
 
 Unlike history artifacts, this file contains only the latest coherent snapshot
 and should be replaced atomically whenever a new snapshot is published.
@@ -46,10 +46,10 @@ class Progress(TypedDict):
 class TrainSnapshot(TypedDict):
     """Current coherent snapshot of a training runtime.
 
-    The epoch, batch, loss, and learning rates in one snapshot describe the
-    same training position. Writers should publish the complete structure
-    atomically so readers never observe progress and runtime values from
-    different batches.
+    The epoch, batch, loss, learning rates, and publication time in one snapshot
+    describe the same training position. Writers should publish the complete
+    structure atomically so readers never observe progress and runtime values
+    from different batches.
 
     Epoch and batch progress use one-based positions intended for external
     observation. For example, epoch ``1`` and batch ``1`` identify the first
@@ -71,6 +71,10 @@ class TrainSnapshot(TypedDict):
             Current learning rate for each optimizer parameter group. The list
             order matches the optimizer parameter-group order.
 
+        updated_at:
+            Unix timestamp at which this training position was published as
+            the current snapshot.
+
     Example:
         Snapshot while processing batch 120 of epoch 3:
 
@@ -85,6 +89,7 @@ class TrainSnapshot(TypedDict):
         ...     },
         ...     "loss": 0.312,
         ...     "learning_rates": [0.0001],
+        ...     "updated_at": 1786257601.482,
         ... }
     """
 
@@ -92,3 +97,4 @@ class TrainSnapshot(TypedDict):
     batch: Progress
     loss: float
     learning_rates: list[float]
+    updated_at: float
