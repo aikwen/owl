@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 from torch.utils.data import ConcatDataset, DataLoader
 
 from .base import _DataConfig, _build_dataset
-from .types import DataDeclaration
+from .types import DataDeclaration, SamplerDeclaration
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -101,14 +101,37 @@ class TrainData(_DataConfig):
             The declarations are normalized into an immutable tuple during
             initialization so later mutations to a caller-owned list do not
             affect the configuration.
+
+        sampler:
+            Optional declaration describing how to construct the training sampler.
+
+            A sampler constructor may be supplied directly when it requires only the
+            resolved training dataset:
+
+                sampler=CustomSampler
+
+            Sampler-specific keyword arguments may also be supplied with the
+            constructor:
+
+                sampler=(
+                    CustomSampler,
+                    {
+                        "seed": 42,
+                    },
+                )
+
+            The sampler is constructed by the training data resolver after the final
+            training dataset has been resolved. The resolved training dataset is
+            supplied as the first constructor argument.
     """
 
     sources: DataDeclaration | list[DataDeclaration] = field(
         default_factory=list,
     )
+    sampler: SamplerDeclaration | None = None
 
     def __post_init__(self) -> None:
-        """Copy shared options and normalize source declarations."""
+        """Copy mutable options and normalize source declarations."""
 
         _DataConfig.__post_init__(self)
 
@@ -124,6 +147,18 @@ class TrainData(_DataConfig):
             sources,
         )
 
+        if isinstance(self.sampler, tuple):
+            constructor, options = self.sampler
+
+            object.__setattr__(
+                self,
+                "sampler",
+                (
+                    constructor,
+                    dict(options),
+                ),
+            )
+
 
 def resolve_train_data(config: TrainData) -> DataLoader:
     """Resolve a training data configuration into one dataloader.
@@ -132,6 +167,11 @@ def resolve_train_data(config: TrainData) -> DataLoader:
     When multiple sources are declared, their datasets are concatenated in
     declaration order. A single source is passed directly to ``DataLoader`` so
     an unnecessary ``ConcatDataset`` wrapper is avoided.
+
+    When a sampler declaration is configured, the sampler is constructed after
+    the final training dataset has been resolved and is then supplied to the
+    ``DataLoader``. A configured sampler cannot be combined with
+    ``shuffle=True``.
 
     Args:
         config:
@@ -142,7 +182,8 @@ def resolve_train_data(config: TrainData) -> DataLoader:
 
     Raises:
         ValueError:
-            If no training sources are declared.
+            If no training sources are declared, or if a training sampler is
+            configured together with ``shuffle=True``.
     """
     if not config.sources:
         raise ValueError(
@@ -165,9 +206,29 @@ def resolve_train_data(config: TrainData) -> DataLoader:
         else ConcatDataset(datasets)
     )
 
+    loader_options = dict(config.loader)
+
+    if config.sampler is not None:
+        if loader_options.get("shuffle", False):
+            raise ValueError(
+                "training sampler cannot be used with "
+                "loader option shuffle=True"
+            )
+
+        if isinstance(config.sampler, tuple):
+            constructor, options = config.sampler
+            sampler = constructor(
+                dataset,
+                **options,
+            )
+        else:
+            sampler = config.sampler(dataset)
+
+        loader_options["sampler"] = sampler
+
     return DataLoader(
         dataset,
-        **dict(config.loader),
+        **loader_options,
     )
 
 

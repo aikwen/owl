@@ -26,6 +26,7 @@ or dataloader argument validation.
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, TypeAlias
+from torch.utils.data import Sampler
 
 from ...data.entry import EntrySource
 
@@ -119,19 +120,84 @@ their only resolver-injected argument in v0.0.2.
 
 
 LoaderOptions: TypeAlias = Mapping[str, Any]
-"""Keyword arguments forwarded to ``torch.utils.data.DataLoader``.
+"""Keyword arguments forwarded to `torch.utils.data.DataLoader`.
 
 The invocation layer stores dataloader options as a generic mapping instead of
-duplicating the complete PyTorch ``DataLoader`` constructor in an owl-specific
+duplicating the complete PyTorch `DataLoader` constructor in an owl-specific
 configuration class.
 
 Configuration objects copy this mapping during initialization so later
 top-level mutations to the caller-owned mapping do not change the stored
-configuration. Data resolvers create their own ``dict`` before forwarding the
-options to ``DataLoader``.
+configuration. Data resolvers create their own `dict` before forwarding the
+options to `DataLoader`.
 
-Compatibility between individual options, such as ``shuffle`` and ``sampler``,
-remains the responsibility of PyTorch's ``DataLoader`` implementation.
+These options are intended for DataLoader-level behavior such as batching,
+worker configuration, memory pinning, collation, and related iteration
+settings.
+
+Training samplers are declared separately through `TrainData.sampler`.
+Unlike ordinary DataLoader options, a sampler may require access to the final
+resolved training dataset before it can be constructed. The training data
+resolver therefore materializes the sampler after resolving the dataset and
+injects the resulting sampler instance into the DataLoader options before
+constructing the `DataLoader`.
+
+Compatibility between the remaining forwarded DataLoader options remains the
+responsibility of PyTorch's `DataLoader` implementation.
+"""
+
+
+
+SamplerConstructor: TypeAlias = Callable[..., Sampler]
+"""Callable that constructs a sampler for a resolved training dataset.
+
+The training data resolver supplies the resolved dataset as the first
+argument. Additional sampler-specific options may be forwarded as keyword
+arguments:
+
+    sampler = constructor(
+        dataset,
+        **options,
+    )
+
+The resolved dataset may be a single dataset or a ``ConcatDataset`` depending
+on the training data declaration.
+"""
+
+
+SamplerDeclaration: TypeAlias = (
+    SamplerConstructor
+    | tuple[SamplerConstructor, Mapping[str, Any]]
+)
+"""Declaration describing how to construct a training sampler.
+
+The alias describes the construction contract rather than requiring a
+sampler class specifically. Compatible functions and callable factory objects
+may also satisfy this alias.
+
+A sampler constructor may be supplied directly:
+
+    sampler=CustomSampler
+
+The resolver constructs it with the resolved dataset:
+
+    CustomSampler(dataset)
+
+Sampler-specific keyword arguments may also be supplied:
+
+    sampler=(
+        CustomSampler,
+        {
+            "seed": 42,
+        },
+    )
+
+The resolver then constructs:
+
+    CustomSampler(
+        dataset,
+        seed=42,
+    )
 """
 
 
@@ -140,4 +206,6 @@ __all__ = [
     "EntrySourceConstructor",
     "LoaderOptions",
     "PathLike",
+    "SamplerConstructor",
+    "SamplerDeclaration",
 ]
